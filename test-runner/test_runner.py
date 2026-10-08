@@ -1009,22 +1009,22 @@ def main():
                 # These limits are now in line with the scaler's hard caps (5x base, 50 max per task)
                 if True:
                     if wf in ['wf-4', 'wf-8']:  # Longest workflows
-                        max_scale_limit = "350"  # Restored for success rate (was 500)
+                        max_scale_limit = "350"
                     elif wf == 'wf-7':
-                        max_scale_limit = "300"  # Restored (was 450)
+                        max_scale_limit = "300"
                     elif wf == 'wf-5':
-                        max_scale_limit = "280"  # Restored (was 400)
+                        max_scale_limit = "280"
                     else:
                         max_scale_limit = "250"
                     scale_cooldown = "120"
                 elif False:
                     # Simple workflows: sufficient limits for high targets
                     if wf == 'wf-2':
-                        max_scale_limit = "200"  # Restored (was 350)
+                        max_scale_limit = "200"
                     elif wf in ['wf-1', 'wf-3', 'wf-6']:
-                        max_scale_limit = "180"  # Restored (was 300)
+                        max_scale_limit = "180"
                     else:  # wf-1
-                        max_scale_limit = "150"  # Restored (was 250)
+                        max_scale_limit = "150"
                     scale_cooldown = "180"
                 else:
                     max_scale_limit = None
@@ -1105,7 +1105,6 @@ def main():
                         discord_notifier.notify_retry_service_started(BASELINE, wf)
                         discord_notifier.notify_stage(BASELINE, wf, "Retry Service", "Retry service started as subprocess")
                     print("✅ Retry service started")
-
 
 
                 # 6) Start Load Generator

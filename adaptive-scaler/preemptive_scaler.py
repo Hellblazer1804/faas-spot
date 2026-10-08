@@ -968,12 +968,12 @@ def update_roi_tracker(current_pods, current_success, current_cost_per_hour, wor
     if roi_tracker['negative_roi_ticks'] >= roi_tracker['max_negative_roi_ticks']:
         roi_tracker['scaling_throttled'] = True
         roi_tracker['throttle_reason'] = f"Negative ROI for {roi_tracker['negative_roi_ticks']} ticks"
-        throttle_factor = 0.15  # Only 15% of normal scaling (was 30%) - let retry service lead
+        throttle_factor = 0.15  # Only 15% of normal scaling
         print(f"🛑 ROI-TRACKER: Scaling throttled to {throttle_factor*100:.0f}% - {roi_tracker['throttle_reason']} (retry service is hero)")
     
     # Low ROI but not negative - reduce scaling intensity significantly
     elif roi_value < roi_tracker['min_roi_threshold'] and roi_value >= 0:
-        throttle_factor = 0.35  # Only 35% of normal scaling (was 60%) - let retry service help
+        throttle_factor = 0.35  # Only 35% of normal scaling
         print(f"⚠️ ROI-TRACKER: Low ROI ({roi_value:.2f} < {roi_tracker['min_roi_threshold']}), throttling to {throttle_factor*100:.0f}% (retry service is hero)")
     
     # Good ROI - allow full scaling
@@ -1030,11 +1030,7 @@ def get_recent_success_gain(window=None):
     return sum(entry.get('success_after', 0.0) - entry.get('success_before', 0.0) for entry in window_entries)
 
 def get_cost_win_throttle(success_rate, target_success, normalized_cost, window=None, workflow_name=None):
-    """Return a throttle factor for cost-win mode when gains are marginal and costs are high.
-    
-    TUNED: For complex workflows below target, don't throttle as aggressively - they need
-    more scaling capacity to recover from preemptions.
-    """
+    """Return a throttle factor for cost-win mode when gains are marginal and costs are high."""
     if success_rate is None or target_success is None or target_success <= 0:
         return 1.0
     if normalized_cost is None or normalized_cost <= COST_WIN_NORM_THRESHOLD:
@@ -1250,16 +1246,16 @@ PARETO_COST_NORM_THRESHOLD = 1.2     # 20% above baseline cost per pod-hour
 
 # Cost-win guard: prioritize lower cost when gains are marginal
 # AGGRESSIVE THROTTLING: Let retry service be the hero for recovery
-COST_WIN_NORM_THRESHOLD = 1.05       # Trigger at just 5% above baseline (was 10%)
-COST_WIN_STRONG_NORM_THRESHOLD = 1.15  # Strong throttle at 15% above (was 30%)
-COST_WIN_GAP_FRAC = 0.15             # Within 15% of target success (was 10%)
-COST_WIN_MIN_GAIN = 0.003            # 0.3% absolute gain threshold (was 0.5%)
-COST_WIN_THROTTLE = 0.35             # Only 35% scaling when cost high (was 55%)
-COST_WIN_STRONG_THROTTLE = 0.20      # Only 20% scaling when cost very high (was 40%)
+COST_WIN_NORM_THRESHOLD = 1.05       # Trigger at just 5% above baseline
+COST_WIN_STRONG_NORM_THRESHOLD = 1.15  # Strong throttle at 15% above
+COST_WIN_GAP_FRAC = 0.15             # Within 15% of target success
+COST_WIN_MIN_GAIN = 0.003            # 0.3% absolute gain threshold
+COST_WIN_THROTTLE = 0.35             # Only 35% scaling when cost high
+COST_WIN_STRONG_THROTTLE = 0.20      # Only 20% scaling when cost very high
 COST_WIN_WINDOW = 3
-COST_WIN_SCALE_DOWN_FACTOR = 0.80    # Scale down to 80% (was 90%)
-COST_WIN_STRONG_SCALE_DOWN_FACTOR = 0.70  # Scale down to 70% (was 85%)
-COST_WIN_SCALE_DOWN_MAX_TASKS = 5    # Scale down up to 5 tasks (was 3)
+COST_WIN_SCALE_DOWN_FACTOR = 0.80    # Scale down to 80%
+COST_WIN_STRONG_SCALE_DOWN_FACTOR = 0.70  # Scale down to 70%
+COST_WIN_SCALE_DOWN_MAX_TASKS = 5    # Scale down up to 5 tasks
 
 # Machine packing: 3 pods share 1 machine (same as Emulator.py)
 # When calculating costs, we charge per machine, not per pod
@@ -1516,14 +1512,12 @@ POST_TARGET_CLAMP_SCALE_MULTIPLE = 1.20  # Keep small buffer above base, avoid f
 POST_TARGET_CLAMP_MIN_RUNS = 10
 
 # ============================================================================
-# RAY-INSPIRED OPTIMIZATIONS (from Ray: A Distributed Framework paper)
 # ============================================================================
 # 1. Speculative Replication: Proactively scale bottleneck tasks before failures
 # 2. Lineage-Aware Scaling: Scale upstream tasks when downstream struggles
 # 3. Burst Scaling: Rapid response to preemption signals with quick cooldown
 # 4. Checkpoint Priority: Prefer scaling checkpoint-enabled tasks (cheaper recovery)
 
-# RAY-INSPIRED OPTIMIZATIONS - REDUCED to let retry service be the hero
 SPECULATIVE_REPLICATION_THRESHOLD = 0.35  # Trigger speculative scaling at 35%+ drop-off (more conservative)
 SPECULATIVE_REPLICATION_FACTOR = 1.02     # Only 2% extra capacity - retry service handles rest
 LINEAGE_PROPAGATION_FACTOR = 0.05         # Only 5% propagation - minimal aggressive scaling
@@ -1903,7 +1897,6 @@ def reset_scaling_efficiency_tracker(workflow_name=None, az=None, instance=None)
         print(f"🎰 RL Adaptive Scaler initialized for {workflow_name}")
 
 # ============================================================================
-# RAY-INSPIRED: Speculative Replication
 # ============================================================================
 # Track which tasks have already received speculative replicas this tick
 # This prevents duplicate speculation when the same task is evaluated multiple times
@@ -1951,14 +1944,14 @@ def calculate_speculative_replicas(task_id, current_scale, task_drop_off, bottle
     
     # Trigger 1: High drop-off rate (task is failing frequently)
     if task_drop_off >= SPECULATIVE_REPLICATION_THRESHOLD:
-        drop_off_factor = min(task_drop_off / SPECULATIVE_REPLICATION_THRESHOLD, 1.5)  # was 2.0
+        drop_off_factor = min(task_drop_off / SPECULATIVE_REPLICATION_THRESHOLD, 1.5)
         speculative_replicas = int(current_scale * (SPECULATIVE_REPLICATION_FACTOR - 1) * drop_off_factor)
         speculative_replicas = min(speculative_replicas, MAX_SPECULATIVE_REPLICAS)
         if speculative_replicas > 0:
             print(f"   🔮 RAY-SPECULATIVE: {task_id} drop-off {task_drop_off*100:.1f}% → +{speculative_replicas} speculative replicas")
     
     # Trigger 2: High bottleneck ratio - ONLY for actual bottlenecks (4x+)
-    if bottleneck_ratio >= 4.0 and speculative_replicas == 0:  # was 3.0
+    if bottleneck_ratio >= 4.0 and speculative_replicas == 0:
         bottleneck_speculation = min(1, MAX_SPECULATIVE_REPLICAS)  # Just +1 for bottlenecks
         speculative_replicas = bottleneck_speculation
         print(f"   🔮 RAY-SPECULATIVE: {task_id} bottleneck {bottleneck_ratio:.1f}x → +{speculative_replicas} speculative replicas")
@@ -1977,7 +1970,6 @@ def calculate_speculative_replicas(task_id, current_scale, task_drop_off, bottle
     return speculative_replicas
 
 # ============================================================================
-# RAY-INSPIRED: Lineage-Aware Scaling
 # ============================================================================
 def get_downstream_pressure(task_id, metadata, task_failure_rates, bottleneck_ratios):
     """
@@ -2059,7 +2051,6 @@ def get_burst_scale_factor(task_id, workflow_name=None):
     return 1.0
 
 # ============================================================================
-# RAY-INSPIRED: Checkpoint-Aware Scaling Priority
 # ============================================================================
 def get_checkpoint_scaling_priority(task_id, metadata):
     """
@@ -3072,8 +3063,8 @@ def calculate_kaplan_meier_cost_benefit(current_scale, new_scale, base_scale, su
     # Note: survival_prob is NOT success_rate, but lower survival_prob = higher risk
     # We check if risk is high (survival_prob < 0.5) to justify complex workflow boost
     if True and survival_prob < 0.5:
-        base_benefit *= 1.3  # 30% more benefit for complex workflows AT RISK (was 50%)
-        cost_increase = cost_increase * 0.9  # 10% cost reduction (was 20%)
+        base_benefit *= 1.3  # 30% more benefit for complex workflows
+        cost_increase = cost_increase * 0.9  # 10% cost reduction
     
     # For workflows with target success rates, adjust cost-benefit to achieve targets
     # Simple workflows: target 85-90% (more lenient to maintain high success rates)
@@ -3350,24 +3341,23 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         task_drop_off = task_failure_rates.get(task_id, 0.0) if task_failure_rates else 0.0
         
         # FAILURE-FOCUSED: Tasks with high drop-off get priority scaling
-        # Reduced boosts to prevent cost explosion (was 1.8/1.5/1.3/1.15)
-        if task_drop_off > 0.40:  # >40% drop-off: This task is a major bottleneck (was 30%)
-            min_scale_boost = 1.4  # 40% boost for high-failure tasks (was 80%)
+        if task_drop_off > 0.40:  # >40% drop-off: This task is a major bottleneck
+            min_scale_boost = 1.4  # 40% boost for high-failure tasks
             print(f"   🚨 FAILURE-FOCUSED: {task_id} has {task_drop_off*100:.1f}% drop-off → boosting by 1.4x")
-        elif task_drop_off > 0.30:  # 30-40% drop-off: Significant bottleneck (was 20%)
-            min_scale_boost = 1.25  # 25% boost (was 50%)
+        elif task_drop_off > 0.30:  # 30-40% drop-off: Significant bottleneck
+            min_scale_boost = 1.25  # 25% boost
             print(f"   ⚠️ FAILURE-FOCUSED: {task_id} has {task_drop_off*100:.1f}% drop-off → boosting by 1.25x")
-        elif task_drop_off > 0.20:  # 20-30% drop-off: Moderate bottleneck (was 10%)
-            min_scale_boost = 1.15  # 15% boost (was 30%)
+        elif task_drop_off > 0.20:  # 20-30% drop-off: Moderate bottleneck
+            min_scale_boost = 1.15  # 15% boost
             print(f"   📊 FAILURE-FOCUSED: {task_id} has {task_drop_off*100:.1f}% drop-off → boosting by 1.15x")
-        elif task_drop_off > 0.10:  # 10-20% drop-off: Minor bottleneck (was 5%)
-            min_scale_boost = 1.1  # 10% boost (was 15%)
+        elif task_drop_off > 0.10:  # 10-20% drop-off: Minor bottleneck
+            min_scale_boost = 1.1  # 10% boost
         # Tasks with <5% drop-off: No boost needed - they're working fine
         
         # GLOBAL SUCCESS RATE BOOST: Apply additional boost only when workflow is critically low
         # But ONLY for tasks that have SOME failure rate (not 0% drop-off tasks)
         if success_rate < target * 0.40 and task_drop_off > 0.15:  # Below 40% of target AND task has significant failures
-            additional_boost = 1.1  # 10% additional boost for critical situations (was 20%)
+            additional_boost = 1.1  # 10% additional boost for critical situations
             min_scale_boost *= additional_boost
             print(f"   🔥 CRITICAL workflow ({success_rate*100:.1f}% < {target*0.40*100:.1f}%): additional {additional_boost}x boost for {task_id}")
         
@@ -3396,17 +3386,14 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
             print(f"   ⏸️ Scaling efficiency pause: limiting {task_id} boost to {min_scale_boost:.1f}x ({scaling_efficiency_tracker['pause_reason']})")
         
         # =====================================================================
-        # RAY-INSPIRED OPTIMIZATIONS
         # =====================================================================
         
-        # RAY-INSPIRED 1: Lineage-aware downstream pressure
         # If downstream tasks are struggling, boost upstream to prevent pipeline starvation
         downstream_pressure = get_downstream_pressure(task_id, metadata, task_failure_rates, bottleneck_ratios)
         if downstream_pressure > 1.0:
             min_scale_boost *= downstream_pressure
             print(f"   🔗 RAY-LINEAGE: {task_id} downstream pressure → boost ×{downstream_pressure:.2f} (total: {min_scale_boost:.2f}x)")
         
-        # RAY-INSPIRED 1b: Upstream backpressure propagation
         # If a downstream task (successor) has high failure rate, boost THIS task to keep pipeline flowing
         # This is critical for fan-in/fan-out DAGs like wf-4 where task5 (6 subtasks) feeds into task6 (2 subtasks)
         successors = metadata.get(task_id, {}).get('successors', [])
@@ -3416,7 +3403,6 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
                 min_scale_boost *= successor_backpressure
                 print(f"   🔙 RAY-BACKPRESSURE: {task_id} → {successor_id} has high failure, boosting {task_id} by ×{successor_backpressure:.2f} (total: {min_scale_boost:.2f}x)")
         
-        # RAY-INSPIRED 2: Checkpoint-aware scaling priority
         # Tasks with checkpoints recover faster, so prioritize scaling them
         checkpoint_priority = get_checkpoint_scaling_priority(task_id, metadata)
         if checkpoint_priority > 1.0:
@@ -3478,22 +3464,22 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         elif workflow_name == 'wf-8':
             # wf-8: Conservative per-tick scaling (REDUCED to prevent cost explosion)
             if success_rate < 0.40:  # Critical: < 40%
-                capped_scale_factor = min(effective_scale_factor, 1.4)  # Up to 1.4x per tick (was 1.6x)
+                capped_scale_factor = min(effective_scale_factor, 1.4)  # Up to 1.4x per tick
             elif success_rate < target * 0.60:  # Below 60% of target
-                capped_scale_factor = min(effective_scale_factor, 1.3)  # Up to 1.3x per tick (was 1.5x)
+                capped_scale_factor = min(effective_scale_factor, 1.3)  # Up to 1.3x per tick
             elif success_rate < target * 0.80:  # Below 80% of target
-                capped_scale_factor = min(effective_scale_factor, 1.25)  # Up to 1.25x per tick (was 1.4x)
+                capped_scale_factor = min(effective_scale_factor, 1.25)  # Up to 1.25x per tick
             else:
-                capped_scale_factor = min(effective_scale_factor, 1.2)  # Up to 1.2x per tick (was 1.3x)
+                capped_scale_factor = min(effective_scale_factor, 1.2)  # Up to 1.2x per tick
         elif True:
             # Complex workflows: CONSERVATIVE per-tick scaling to prevent cost explosion
             # Rely on retry service for recovery, not explosive scaling
             if success_rate < target_success * 0.70:  # Well below target
-                capped_scale_factor = min(effective_scale_factor, 1.4)  # Up to +40% per tick (was 80%)
+                capped_scale_factor = min(effective_scale_factor, 1.4)  # Up to +40% per tick
             elif success_rate < target_success:
-                capped_scale_factor = min(effective_scale_factor, 1.3)  # Up to +30% per tick (was 60%)
+                capped_scale_factor = min(effective_scale_factor, 1.3)  # Up to +30% per tick
             else:
-                capped_scale_factor = min(effective_scale_factor, 1.2)  # +20% when at target (was 40%)
+                capped_scale_factor = min(effective_scale_factor, 1.2)  # +20% when at target
         else:
             capped_scale_factor = min(effective_scale_factor, 1.25)  # cap to +25% per tick for simple workflows
         
@@ -3525,7 +3511,6 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         else:
             new_scale = math.ceil(max(current_minscale, effective_base) * capped_scale_factor)
         
-        # RAY-INSPIRED 4: Speculative replication
         # Add extra replicas for tasks likely to fail, similar to Ray's speculative execution
         # NOTE: When machine-aligned, speculative replicas are added to reach next machine boundary
         bottleneck_ratio = bottleneck_ratios.get(task_id, 1.0) if bottleneck_ratios else 1.0
@@ -4580,7 +4565,6 @@ def main():
                         else:
                             new_scale = max(current_minscale, math.ceil(base_minscale * effective_scaling_factor))
                         
-                        # RAY-INSPIRED: Add speculative replicas for high-risk tasks
                         # Use source='km' to prevent duplicate speculation (only critical tasks get speculation)
                         task_drop_off_km = task_failure_rates.get(task_id, 0) if task_failure_rates else 0
                         bottleneck_ratio_km = bottleneck_ratios.get(task_id, 1.0) if bottleneck_ratios else 1.0

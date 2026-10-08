@@ -71,7 +71,6 @@ SUCCESS_RATE_CACHE_TTL = 300  # Cache success rates for 5 minutes
 # Checkpointer-aware retry (checkscale): only prioritize retries from checkpointer-selected tasks
 # When success rate is above threshold, retry only from selected checkpoints; when below, also retry from non-selected
 CHECKPOINTER_SELECTED_PRIORITY_BOOST = 2000   # Priority boost when last checkpoint is at a checkpointer-selected task
-# TUNED: Increased from 0.05 to 0.10 - allow non-selected retries when within 10% of target
 # This helps complex workflows recover faster when they're struggling
 SUCCESS_RATE_THRESHOLD_FOR_NON_SELECTED = 0.10  # Below target by this much → also retry from non-selected checkpoints
 
@@ -191,10 +190,9 @@ class WorkflowInstance:
 _workflow_instances: Dict[Tuple[str, str, str], WorkflowInstance] = {}  # (workflow, baseline, uid) -> instance
 
 # Heartbeat/stall detection configuration
-# RELAXED: Previous values were too aggressive, causing premature workflow abandonment
-STALL_DETECTION_THRESHOLD_SEC = 180.0  # Consider stalled after 180s without progress (was 90s)
-MAX_STALL_COUNT = 10  # Abandon workflow after 10 stalls (was 3) - give more chances
-MAX_CHECKPOINT_RECOVERY_ATTEMPTS_DEFAULT = 15  # Default max attempts to recover from checkpoint (was 5)
+STALL_DETECTION_THRESHOLD_SEC = 180.0  # Consider stalled after 180s without progress
+MAX_STALL_COUNT = 10  # Abandon workflow after 10 stalls - give more chances
+MAX_CHECKPOINT_RECOVERY_ATTEMPTS_DEFAULT = 15  # Default max attempts to recover from checkpoint
 MAX_CHECKPOINT_RECOVERY_ATTEMPTS_COMPLEX = 20  # Complex workflows get more recovery attempts
 MAX_CHECKPOINT_RECOVERY_ATTEMPTS_LONGEST = 30  # Longest workflows (wf-4, wf-8) get most attempts
 
@@ -251,7 +249,6 @@ def should_abandon_workflow(instance: WorkflowInstance) -> Tuple[bool, str]:
         return True, f"Exceeded max checkpoint recovery attempts ({max_attempts})"
     
     # Workflow has been running too long without completion (30 minutes)
-    # RELAXED: 10 minutes was too aggressive for complex workflows
     if time.time() - instance.created_at > 1800 and len(instance.completed_tasks) == 0:
         return True, "No progress after 30 minutes"
     
@@ -312,10 +309,9 @@ retry_efficiency_tracker = {
     'pause_reason': None
 }
 
-# RETRY SERVICE IS THE HERO - aggressive batch sizes
 # Scaler is throttled, so retry service must handle most recovery
 # Configurable via env: RETRY_MAX_RETRIES_PER_CYCLE, RETRY_THREAD_POOL_SIZE (see below)
-MAX_RETRIES_PER_CYCLE = int(os.getenv('RETRY_MAX_RETRIES_PER_CYCLE', '250'))   # Batch per cycle (was 150)
+MAX_RETRIES_PER_CYCLE = int(os.getenv('RETRY_MAX_RETRIES_PER_CYCLE', '250'))
 MAX_TOTAL_RETRIES_BUDGET = 5000  # Very high budget - retry service is primary recovery
 
 def update_retry_efficiency(current_success_rate, total_retries_this_cycle):
@@ -1696,9 +1692,8 @@ def clear_retry_state(uid: str, workflow_name: str, baseline: str):
 # -------------------------
 
 # Thread pool for parallel retry requests
-# RETRY SERVICE IS THE HERO - large thread pool for maximum throughput
 # Configurable via env RETRY_THREAD_POOL_SIZE
-RETRY_THREAD_POOL_SIZE = int(os.getenv('RETRY_THREAD_POOL_SIZE', '50'))  # Process up to 50 retries concurrently (was 25)
+RETRY_THREAD_POOL_SIZE = int(os.getenv('RETRY_THREAD_POOL_SIZE', '50'))
 
 def retry_from_checkpoint(task_id: str, checkpoint: Any, fn_url: str,
                           uid: str, workflow_name: str, baseline: str) -> int:
@@ -1968,7 +1963,6 @@ def main():
             target_success = get_target_success_rate(workflow)
             pareto_bias = should_pareto_bias_retries(current_success_rate, target_success, normalized_cost)
             
-            # RETRY SERVICE IS THE HERO - very large batch sizes
             if roi_should_boost:
                 # ROI-AWARE: Scaler is ineffective, retry service leads with MASSIVE batch
                 effective_max_uids = min(int(150 * roi_boost_factor), MAX_RETRIES_PER_CYCLE)  # Was 100
@@ -1984,11 +1978,9 @@ def main():
                 effective_max_uids = min(60, MAX_RETRIES_PER_CYCLE // 2)  # Was 40
                 print(f"   💰 Success above target ({current_success_rate*100:.1f}%>{target_success*100:.1f}%): limiting to {effective_max_uids} UIDs")
             elif True:
-                # Complex workflows (wf-4,6,8,9): RETRY SERVICE IS THE HERO
                 # Scaler is throttled, so retry service must handle most recovery
-                effective_max_uids = 140  # Very high limit (was 100) - retry service is hero
+                effective_max_uids = 140
             else:
-                # Simple workflows: larger batch size since scaler is throttled
                 effective_max_uids = min(80, MAX_RETRIES_PER_CYCLE)  # Was 50
             
             if retry_lead_active and not roi_should_boost:
