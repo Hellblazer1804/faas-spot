@@ -1,0 +1,10 @@
+{
+    "tasks": {
+      "task1": { "exec_time": 1, "successors": ["task2"], "minscale": 1 },
+      "task2": { "exec_time": 3, "successors": ["task3"] , "minscale": 3},
+      "task3": { "exec_time": 3, "successors": ["task4"] , "minscale": 3},
+      "task4": { "exec_time": 3, "successors": ["task5"] , "minscale": 3},
+      "task5": { "exec_time": 1, "successors": [] , "minscale": 1}
+    }
+  }
+  

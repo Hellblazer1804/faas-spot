@@ -1,0 +1,185 @@
+# =====================================================================
+# Deployment with HTTP Health Probes
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retry-service-http
+  namespace: retry
+  labels:
+    app: retry-service-http
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: retry-service-http
+  template:
+    metadata:
+      labels:
+        app: retry-service-http
+    spec:
+      serviceAccountName: retry-service
+      containers:
+        - name: retry-service
+          image: YOUR_REGISTRY/retry-service:latest
+          imagePullPolicy: Always
+
+          # Use HTTP health-enabled version
+          command: ["python3", "/app/retry_service_with_http_health.py"]
+          args:
+            - "--baseline=$(BASELINE)"
+            - "--workflow=$(WORKFLOW_FILTER)"
+            - "--health-port=8080"
+
+          # Expose health port
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: retry-config
+
+          env:
+            # ---------- MySQL ----------
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-host
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-user
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-password
+            - name: MYSQL_DB
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-db
+
+            # ---------- Redis ----------
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_PORT
+            - name: REDIS_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_USER
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: redis-password
+
+            # ---------- Router & Workflows ----------
+            - name: FISSION_ROUTER_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: FISSION_ROUTER_PREFIX
+            - name: WORKFLOW_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: WORKFLOW_DIR
+
+            # ---------- Retry knobs ----------
+            - name: POLL_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: POLL_INTERVAL
+            - name: COOLDOWN_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: COOLDOWN_SEC
+            - name: MAX_RETRIES_PER_UID
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: MAX_RETRIES_PER_UID
+            - name: BASELINE
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: BASELINE
+            - name: WORKFLOW_FILTER
+              valueFrom:
+                configMapKeyRef: 
+                  name: retry-config
+                  key: WORKFLOW_FILTER
+
+          volumeMounts:
+            - name: secrets-volume
+              mountPath: /secrets
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # HTTP Health Probes
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: redis-auth
+            items:
+              - key: redis-password
+                path: redis/redis-redis-cluster/redis-password
+
+---
+# ==========================================
+# Service for HTTP Health Probes
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: retry-service-http
+  namespace: retry
+spec:
+  selector:
+    app: retry-service-http
+  ports:
+    - name: health
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

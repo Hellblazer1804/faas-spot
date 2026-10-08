@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Discord config with real token (use discord_config.json.example instead)
+discord_config.json
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Runtime outputs
+*.log
+*.out
+hey_report_*
+fn_files/
+
+# Scaler runtime state
+adaptive-scaler/rl-state-files/
+adaptive-scaler/scale_history.json
+load-generator/scale_history.json
+
+# Emulator cost logs (generated at runtime)
+spot-emulator/cost-logs/
+
+# matplotlib / fontconfig caches
+adaptive-scaler/.cache/
+adaptive-scaler/.matplotlib/
+

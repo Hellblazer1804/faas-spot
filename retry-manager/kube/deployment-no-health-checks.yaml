@@ -1,0 +1,270 @@
+# =====================================================================
+# Namespace (optional — delete if you deploy into an existing namespace)
+# =====================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: retry
+---
+# =========================================================
+# ServiceAccount (retry service doesn't need cluster RBAC)
+# =========================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: retry-service
+  namespace: retry
+---
+# ==========================================
+# Secret: MySQL credentials for the service
+#   - If you already have one, keep it and
+#     update the Deployment env to match.
+# ==========================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-auth
+  namespace: retry
+type: Opaque
+stringData:
+  mysql-host: "CHANGE_ME"
+  mysql-user: "CHANGE_ME"
+  mysql-password: "CHANGE_ME"
+  mysql-db: "CHANGE_ME"
+---
+# ==========================================
+# Secret: Redis password
+#   - Reuse the one created by the Bitnami
+#     chart if you like:
+#       name: redis-auth
+#       key:  redis-password
+#   - If you want a dedicated copy here, keep
+#     this object; otherwise delete this block
+#     and update the Deployment to reference
+#     the original Secret in the redis ns via
+#     secretRef + namespaceSelector (or just
+#     create a local Secret with same key).
+# ==========================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-auth
+  namespace: retry
+type: Opaque
+stringData:
+  redis-password: "CHANGE_ME"
+---
+# ==========================================
+# ConfigMap: runtime tunables & endpoints
+#   - Baseline and (optional) per-workflow
+#     scope live here so you can tweak them
+#     without rebuilding the image.
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retry-config
+  namespace: retry
+data:
+  # Retry loop knobs
+  POLL_INTERVAL: "20"          # seconds between scans
+  COOLDOWN_SEC: "60"           # per-UID cooldown after any attempt
+  MAX_RETRIES_PER_UID: "3"     # hard cap stored in DB table too
+
+  # Baseline and optional workflow filter
+  BASELINE: "ours"
+  WORKFLOW_FILTER: "wf-1"     # uncomment to restrict to a single workflow
+
+  # Fission router base (http://<node-ip>:<nodeport>/fission-function/)
+  FISSION_ROUTER_PREFIX: "http://CHANGE_ME:32363/fission-function/"
+
+  # Redis cluster DNS (Bitnami chart, same namespace as Redis)
+  REDIS_HOST: "redis-redis-cluster.redis.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_USER: "default"
+
+  # If your image bakes the workflows at /app/workflows, keep this:
+  WORKFLOW_DIR: "/app/workflows"
+---
+# ==========================================
+# Deployment: retry-service (NO HEALTH CHECKS)
+#   - Assumes you built and pushed an image
+#     that already contains the /app/workflows
+#     directory (from your repo layout).
+#   - Replace the image reference below.
+#   - Health checks are disabled to avoid ps command issues
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retry-service
+  namespace: retry
+  labels:
+    app: retry-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: retry-service
+  template:
+    metadata:
+      labels:
+        app: retry-service
+    spec:
+      serviceAccountName: retry-service
+      containers:
+        - name: retry-service
+          # TODO: set your pushed image here
+          image: YOUR_REGISTRY/retry-service:latest
+          imagePullPolicy: Always
+
+          # Override the entire command to ensure proper execution
+          command: ["python3", "/app/retry_service.py"]
+          args:
+            - "--baseline=$(BASELINE)"
+            - "--workflow=$(WORKFLOW_FILTER)"
+            - "--poll=$(POLL_INTERVAL)"
+            - "--cooldown=$(COOLDOWN_SEC)"
+            # - "--clear"   # one-time: truncate checkpoint_retries on start
+
+          envFrom:
+            - configMapRef:
+                name: retry-config
+
+          env:
+            # ---------- MySQL ----------
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-host
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-user
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-password
+            - name: MYSQL_DB
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: mysql-db
+
+            # ---------- Redis ----------
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_PORT
+            - name: REDIS_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: REDIS_USER
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: redis-password
+
+            # ---------- Router & Workflows ----------
+            - name: FISSION_ROUTER_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: FISSION_ROUTER_PREFIX
+            - name: WORKFLOW_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: WORKFLOW_DIR
+
+            # ---------- Retry knobs (kept in CM but also exported for code paths that read env) ----------
+            - name: POLL_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: POLL_INTERVAL
+            - name: COOLDOWN_SEC
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: COOLDOWN_SEC
+            - name: MAX_RETRIES_PER_UID
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: MAX_RETRIES_PER_UID
+            - name: BASELINE
+              valueFrom:
+                configMapKeyRef:
+                  name: retry-config
+                  key: BASELINE
+            - name: WORKFLOW_FILTER
+              valueFrom:
+                configMapKeyRef: 
+                  name: retry-config
+                  key: WORKFLOW_FILTER
+
+          volumeMounts:
+            - name: secrets-volume
+              mountPath: /secrets
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # NO HEALTH CHECKS - Comment out or remove these to avoid ps command issues
+          # livenessProbe:
+          #   exec:
+          #     command: ["python3", "/app/health_check.py"]
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30
+          #   timeoutSeconds: 10
+          #   failureThreshold: 3
+          # readinessProbe:
+          #   exec:
+          #     command: ["python3", "/app/health_check.py"]
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 15
+          #   timeoutSeconds: 10
+          #   failureThreshold: 3
+
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: redis-auth
+            items:
+              - key: redis-password
+                path: redis/redis-redis-cluster/redis-password
+
+      # Optional hard anti-affinity so it doesn't co-locate with something else noisy
+      # topologySpreadConstraints could also be added if you run >1 replicas.
+---
+# ==========================================
+# PodDisruptionBudget (optional)
+# ==========================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: retry-service
+  namespace: retry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: retry-service

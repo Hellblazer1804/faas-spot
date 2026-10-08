@@ -1,0 +1,124 @@
+{
+  "task1": {
+    "exec_time": 2,
+    "successors": [
+      "task2"
+    ],
+    "minscale": 9,
+    "scaling_factor": 1.09,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_1": 3,
+      "machine_2": 3,
+      "machine_3": 3
+    },
+    "heft_rank": 33
+  },
+  "task2": {
+    "exec_time": 3,
+    "successors": [
+      "task3"
+    ],
+    "minscale": 12,
+    "scaling_factor": 1.08,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_4": 3,
+      "machine_5": 3,
+      "machine_6": 3,
+      "machine_7": 3
+    },
+    "heft_rank": 31
+  },
+  "task3": {
+    "exec_time": 6,
+    "successors": [
+      "task4"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.07,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_8": 3
+    },
+    "heft_rank": 28
+  },
+  "task4": {
+    "exec_time": 6,
+    "successors": [
+      "task5"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.06,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_9": 3
+    },
+    "heft_rank": 22
+  },
+  "task5": {
+    "exec_time": 4,
+    "successors": [
+      "task6"
+    ],
+    "minscale": 9,
+    "scaling_factor": 1.04,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_10": 3,
+      "machine_11": 3,
+      "machine_12": 3
+    },
+    "heft_rank": 16
+  },
+  "task6": {
+    "exec_time": 5,
+    "successors": [
+      "task7"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.03,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_13": 3
+    },
+    "heft_rank": 12
+  },
+  "task7": {
+    "exec_time": 2,
+    "successors": [
+      "task8"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.02,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_14": 3
+    },
+    "heft_rank": 7
+  },
+  "task8": {
+    "exec_time": 2,
+    "successors": [
+      "task9"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.01,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_15": 3
+    },
+    "heft_rank": 5
+  },
+  "task9": {
+    "exec_time": 3,
+    "successors": [],
+    "minscale": 1,
+    "scaling_factor": 1.01,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_16": 1
+    },
+    "heft_rank": 3
+  }
+}

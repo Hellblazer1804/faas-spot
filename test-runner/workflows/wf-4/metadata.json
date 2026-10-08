@@ -1,0 +1,54 @@
+{
+  "task1": {
+    "exec_time": 2,
+    "successors": [
+      "task2"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.58,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_1": 3
+    },
+    "heft_rank": 12
+  },
+  "task2": {
+    "exec_time": 4,
+    "successors": [
+      "task3"
+    ],
+    "minscale": 2,
+    "scaling_factor": 1.48,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_2": 2
+    },
+    "heft_rank": 10
+  },
+  "task3": {
+    "exec_time": 3,
+    "successors": [
+      "task4"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.35,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_2": 1,
+      "machine_3": 2
+    },
+    "heft_rank": 6
+  },
+  "task4": {
+    "exec_time": 3,
+    "successors": [],
+    "minscale": 3,
+    "scaling_factor": 1.2,
+    "is_scalable": true,
+    "machine_ids": {
+      "machine_3": 1,
+      "machine_4": 2
+    },
+    "heft_rank": 3
+  }
+}

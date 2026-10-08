@@ -1,0 +1,12 @@
+{
+    "tasks": {
+      "task1": { "exec_time": 2, "successors": ["task2"] , "minscale": 1},
+      "task2": { "exec_time": 2, "successors": ["task3"] , "minscale": 1},
+      "task3": { "exec_time": 3, "successors": ["task3a", "task3b"] , "minscale": 1},
+      "task3a": { "exec_time": 1, "successors": ["taskr1"] , "minscale": 1},
+      "task3b": { "exec_time": 1, "successors": ["taskr2"] , "minscale": 1},
+      "taskr1": { "exec_time": 1, "successors": [] , "minscale": 1},
+      "taskr2": { "exec_time": 1, "successors": [] , "minscale": 1}
+    }
+  }
+  
