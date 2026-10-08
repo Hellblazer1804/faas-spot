@@ -408,9 +408,9 @@ def main():
 
     # All workflows for all baselines
     all_workflows = sorted([d for d in os.listdir(WORKFLOWS_DIR) if d.startswith("wf-") and os.path.exists(os.path.join(WORKFLOWS_DIR, d, "tasks.json"))])
-    default_workflows = all_workflows if all_workflows else ['wf-5', 'wf-6', 'wf-8', 'wf-9']
+    default_workflows = all_workflows if all_workflows else ['wf-4', 'wf-5', 'wf-7', 'wf-8']
     BASELINE_WORKFLOWS = {
-        # "mscheduler": ['wf-4'],
+        # "mscheduler": ['wf-3'],
         "snape": [workflow for workflow in all_workflows],
         # "bag_of_tasks": [workflow for workflow in all_workflows],
         # "ofp_tm": [workflow for workflow in all_workflows],

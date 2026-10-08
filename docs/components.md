@@ -1,6 +1,6 @@
 # FaaS-on-Spot: Component Reference
 
-This document describes the five core components of FaaS-on-Spot: Ranker, Checkpointer, Scaler, Retry Service, and Emulator. For instructions on running experiments, see [DOCUMENTATION.md](DOCUMENTATION.md).
+This document describes the five core components of FaaS-on-Spot: Ranker, Checkpointer, Scaler, Retry Service, and Emulator. For instructions on running experiments, see [README.md](../README.md).
 
 ---
 
@@ -16,8 +16,8 @@ This document describes the five core components of FaaS-on-Spot: Ranker, Checkp
 
 ## Ranker
 
-**Location:** `Ranker/`  
-**Entry point:** `Ranker/heft_rank_identifier.py`
+**Location:** `task-ranker/`  
+**Entry point:** `task-ranker/heft_rank_identifier.py`
 
 ### Purpose
 
@@ -67,19 +67,19 @@ This runs once before an experiment starts. Its output (`metadata.json`) is cons
 ### CLI Reference
 
 ```
-python3 Ranker/heft_rank_identifier.py
-  --workflow       wf-1                       # Workflow name
-  --budget         300                        # Spot budget in dollars
-  --workflows-dir  Algorithm-Tester/workflows # Directory containing workflow subdirs
-  --baseline       ours                       # Baseline label
+python3 task-ranker/heft_rank_identifier.py
+  --workflow       wf-1                 # Workflow name
+  --budget         300                  # Spot budget in dollars
+  --workflows-dir  test-runner/workflows # Directory containing workflow subdirs
+  --baseline       ours                 # Baseline label
 ```
 
 ---
 
 ## Checkpointer
 
-**Location:** `Checkpoint-Planner/`  
-**Entry point:** `Checkpoint-Planner/checkpointer.py`
+**Location:** `checkpoint-planner/`  
+**Entry point:** `checkpoint-planner/checkpointer.py`
 
 ### Purpose
 
@@ -123,7 +123,7 @@ The resulting plan is stored in MySQL and read by the Retry Service at runtime t
 
 **Required files:**
 - `{workflows_dir}/{workflow}/tasks.json` — task graph
-- `{checkpoint_service_dir}/spot-traces-csv/{az}_{instance}_cdf.csv` — spot lifetime CDF
+- `checkpoint-planner/spot-traces-csv/{az}_{instance}_cdf.csv` — spot lifetime CDF
 
 **CDF format:**
 ```csv
@@ -144,15 +144,15 @@ Checkpoint plan for wf-1:
 ### CLI Reference
 
 ```
-python3 Checkpoint-Planner/checkpointer.py
-  --workflows-dir     Algorithm-Tester/workflows  # Workflow definitions
-  --workflow          wf-1                        # Workflow name
-  --az                us-west-2a                  # Availability zone for CDF lookup
-  --instance          v100                        # Instance type for CDF lookup
-  --checkpoint-factor 0.2                         # Max checkpoint overhead (fraction)
-  --recovery-time     1.0                         # Estimated recovery overhead (seconds)
-  --baseline          ours                        # Baseline label for DB write
-  --write-plan-to-db                              # Persist plan to MySQL (flag)
+python3 checkpoint-planner/checkpointer.py
+  --workflows-dir     test-runner/workflows  # Workflow definitions
+  --workflow          wf-1                   # Workflow name
+  --az                us-west-2a             # Availability zone for CDF lookup
+  --instance          v100                   # Instance type for CDF lookup
+  --checkpoint-factor 0.2                    # Max checkpoint overhead (fraction)
+  --recovery-time     1.0                    # Estimated recovery overhead (seconds)
+  --baseline          ours                   # Baseline label for DB write
+  --write-plan-to-db                         # Persist plan to MySQL (flag)
 ```
 
 ### Configuration Constants
@@ -167,9 +167,9 @@ python3 Checkpoint-Planner/checkpointer.py
 
 ## Scaler
 
-**Location:** `Scaler/`  
-**Entry point:** `Scaler/preemptive_scaler.py`  
-**Supporting modules:** `rl_bandit.py`, `rl_config.py`, `rl_state.py`
+**Location:** `adaptive-scaler/`  
+**Entry point:** `adaptive-scaler/preemptive_scaler.py`  
+**Supporting modules:** `adaptive-scaler/rl_bandit.py`, `adaptive-scaler/rl_config.py`, `adaptive-scaler/rl_state.py`
 
 ### Purpose
 
@@ -181,7 +181,7 @@ The Scaler operates continuously in a polling loop (every 30 seconds) alongside 
 
 1. **State observation:** Every tick, the Scaler queries MySQL for the current success rate, retry exhaustion count, elapsed time, and pod count. These form a 6-dimensional context vector.
 
-2. **Cold start phase:** At startup, the Scaler observes but restricts its actions. Simple workflows (wf-1–4, 7) have a 30-minute cold start during which the Scaler remains idle (action 0 only), allowing the Retry Service to handle recovery first. Complex workflows (wf-5, 6, 8, 9) use a 2-minute cold start to enable faster intervention.
+2. **Cold start phase:** At startup, the Scaler observes but restricts its actions. Simple workflows (wf-1–4, 7) have a 30-minute cold start during which the Scaler remains idle (action 0 only), allowing the Retry Service to handle recovery first. Complex workflows (wf-4, 6, 8, 9) use a 2-minute cold start to enable faster intervention.
 
 3. **Action selection:** A Thompson Sampling bandit samples reward estimates for each allowed action and selects the highest. Budget remaining determines which actions are permitted (see budget thresholds below).
 
@@ -189,7 +189,7 @@ The Scaler operates continuously in a polling loop (every 30 seconds) alongside 
 
 5. **Reward computation:** After an observation window (60 seconds), the change in success rate divided by cost incurred is the reward signal. The bandit updates its posterior for the (context, action) pair.
 
-6. **Persistence:** Bandit state (posterior parameters) is saved to `Scaler/rl-state-files/rl_state_{workflow}_{baseline}.json` after each update so state is preserved across restarts.
+6. **Persistence:** Bandit state (posterior parameters) is saved to `adaptive-scaler/rl-state-files/rl_state_{workflow}_{baseline}.json` after each update so state is preserved across restarts. The `rl-state-files/` directory is created at runtime.
 
 ### Action Space
 
@@ -225,13 +225,13 @@ The Scaler operates continuously in a polling loop (every 30 seconds) alongside 
 | Workflow class | Workflows | Target |
 |---|---|---|
 | Simple | wf-1, 2, 3, 4, 7 | 97.5% |
-| Complex | wf-5, 6, 8, 9 | 67.5% |
+| Complex | wf-4, 6, 8, 9 | 67.5% |
 
 ### Budget Defaults
 
 | Workflow | Budget (% of on-demand) |
 |---|---|
-| wf-5, wf-9 | 60% |
+| wf-4, wf-8 | 60% |
 | All others | 50% |
 
 ### Key Classes & Functions
@@ -246,17 +246,17 @@ The Scaler operates continuously in a polling loop (every 30 seconds) alongside 
 ### CLI Reference
 
 ```
-python3 Scaler/preemptive_scaler.py
-  --workflows-dir   Algorithm-Tester/workflows  # Workflow definitions
-  --workflow        wf-1                        # Workflow name
-  --baseline        ours                        # Baseline label
-  --experiment-tag  main_experiment             # DB tag (can also use EXPERIMENT_TAG env)
+python3 adaptive-scaler/preemptive_scaler.py
+  --workflows-dir   test-runner/workflows  # Workflow definitions
+  --workflow        wf-1                   # Workflow name
+  --baseline        ours                   # Baseline label
+  --experiment-tag  main_experiment        # DB tag (can also use EXPERIMENT_TAG env)
 ```
 
 ### Unit Tests
 
 ```bash
-cd Scaler
+cd adaptive-scaler
 python3 test_rl_modules.py
 ```
 
@@ -266,9 +266,9 @@ Tests cover: action selection determinism, context normalization, Thompson Sampl
 
 ## Retry Service
 
-**Location:** `Retry-Service-v2/`  
-**Entry point:** `Retry-Service-v2/retry_service.py`  
-**Alternative:** `Retry-Service-v2/retry_service_with_http_health.py` (adds `/health` HTTP endpoint)
+**Location:** `retry-manager/`  
+**Entry point:** `retry-manager/retry_service.py`  
+**Alternative:** `retry-manager/retry_service_with_http_health.py` (adds `/health` HTTP endpoint)
 
 ### Purpose
 
@@ -284,7 +284,7 @@ The Retry Service runs as a long-lived Kubernetes pod throughout the experiment.
 
 3. **Priority-ordered retries:** Tasks with Saga-level checkpoints (level 3) are retried concurrently. Critical-level (level 2) tasks get higher queue priority. Standard (level 1) retries are queued normally.
 
-4. **Retry limits:** Simple workflows allow 12–18 retries per UID. Complex workflows (wf-5, 6, 8, 9) allow 25–35 retries because the Retry Service is the primary recovery mechanism for deep DAGs where preemptions are more frequent.
+4. **Retry limits:** Simple workflows allow 12–18 retries per UID. Complex workflows (wf-4, 6, 8, 9) allow 25–35 retries because the Retry Service is the primary recovery mechanism for deep DAGs where preemptions are more frequent.
 
 5. **Adaptive backoff:** On repeated failures, backoff grows exponentially from 30 seconds up to 300 seconds, with jitter to prevent thundering herd.
 
@@ -295,7 +295,7 @@ The Retry Service runs as a long-lived Kubernetes pod throughout the experiment.
 | Workflow class | Max retries per UID |
 |---|---|
 | Simple (wf-1–4, 7) | 12–18 |
-| Complex (wf-5, 6, 8, 9) | 25–35 |
+| Complex (wf-4, 6, 8, 9) | 25–35 |
 
 ### Key Functions
 
@@ -310,7 +310,7 @@ The Retry Service runs as a long-lived Kubernetes pod throughout the experiment.
 **Deploy with health checks (recommended):**
 
 ```bash
-kubectl apply -f Retry-Service-v2/kube/deployment.yaml
+kubectl apply -f retry-manager/kube/deployment.yaml
 ```
 
 The pod uses `health_check.py` as its liveness and readiness probe. This script verifies Python functionality, the `/app/workflows` directory, required module imports, and environment variables.
@@ -318,7 +318,7 @@ The pod uses `health_check.py` as its liveness and readiness probe. This script 
 **Deploy without health checks:**
 
 ```bash
-kubectl apply -f Retry-Service-v2/kube/deployment-no-health-checks.yaml
+kubectl apply -f retry-manager/kube/deployment-no-health-checks.yaml
 ```
 
 **Required Kubernetes resources:**
@@ -338,7 +338,7 @@ kubectl exec -n retry deployment/retry-service -- python3 /app/health_check.py
 ### CLI Reference (local run)
 
 ```
-python3 Retry-Service-v2/retry_service.py
+python3 retry-manager/retry_service.py
   --workflow      wf-1   # Workflow name
   --baseline      ours   # Baseline label
   --poll-interval 5      # Seconds between DB polls
@@ -361,8 +361,8 @@ python3 Retry-Service-v2/retry_service.py
 
 ## Emulator
 
-**Location:** `New-Emulator/`  
-**Entry point:** `New-Emulator/Emulator.py`
+**Location:** `spot-emulator/`  
+**Entry point:** `spot-emulator/Emulator.py`
 
 ### Purpose
 
@@ -380,7 +380,7 @@ The Emulator enables reproducible experiments: the same CDF produces statistical
 
 4. **Preemption injection:** When a spot pod's assigned lifetime expires (in emulator time), the Emulator calls `kubectl delete pod` to simulate the preemption. The Retry Service detects the resulting task failure and initiates recovery.
 
-5. **Cost logging:** Pod uptime and type are recorded in the `cost_logs` MySQL table using pricing from `{az}_{instance}_cost.csv`. The Scaler reads these logs to compute normalized cost for its context features.
+5. **Cost logging:** Pod uptime and type are recorded in the `cost_logs` MySQL table using pricing from `spot-emulator/tracing/spot-cost-csv/{az}_{instance}_cost.csv`. The Scaler reads these logs to compute normalized cost for its context features.
 
 6. **Time compression:** All timing is multiplied by `EMULATOR_TIME_COMPRESSION = 60`. A CDF entry of 300 seconds (5 minutes) becomes a 5-second event in real time.
 
@@ -406,33 +406,27 @@ The Emulator enables reproducible experiments: the same CDF produces statistical
 
 | File pattern | Location | Description |
 |---|---|---|
-| `{az}_{instance}_cdf_survival_curve.json` | `Scaler/survival_curves/` | Survival curve for Scaler KM threshold |
-| `{az}_{instance}_cdf.csv` | `Checkpoint-Planner/spot-traces-csv/` | CDF used by Checkpointer |
-| `{az}_{instance}_cdf.csv` | `New-Emulator/tracing/` | CDF used by Emulator |
-| `{az}_{instance}_cost.csv` | `New-Emulator/tracing/` | Pricing per pod type |
+| `{az}_{instance}_cdf_survival_curve.json` | `adaptive-scaler/survival_curves/` | Survival curve for Scaler KM threshold (generated by `adaptive-scaler/generate_survival_curve.py`) |
+| `{az}_{instance}_cdf.csv` | `checkpoint-planner/spot-traces-csv/` | CDF used by Checkpointer |
+| `{az}_{instance}_1_cdf.csv` | `spot-emulator/tracing/spot-traces-csv/` | CDF used by Emulator (directory must be created and populated) |
+| `{az}_{instance}_cost.csv` | `spot-emulator/tracing/spot-cost-csv/` | Pricing per pod type (directory must be created and populated) |
 
-**Generating traces from raw data:**
+### Emulator CLI Reference
 
-```bash
-python3 New-Emulator/tracing/lifetime_trace_generator.py
+```text
+python3 spot-emulator/Emulator.py
+  --workflow                  wf-1          # Workflow name
+  --baseline                  ours          # Baseline label
+  --az                        us-west-2a    # Availability zone
+  --instance                  v100          # Instance type
+  --pods-per-machine          3             # Virtual machine packing ratio
+  --emulator-interval-seconds 5             # How often to check pod ages (seconds)
 ```
 
-### CLI Reference
-
-```
-python3 New-Emulator/Emulator.py
-  --workflow                 wf-1          # Workflow name
-  --baseline                 ours          # Baseline label
-  --az                       us-west-2a    # Availability zone
-  --instance                 v100          # Instance type
-  --pods-per-machine         3             # Virtual machine packing ratio
-  --emulator-interval-seconds 5            # How often to check pod ages (seconds)
-```
-
-### Configuration
+### Emulator Configuration
 
 | Parameter | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `PODS_PER_MACHINE` | `3` | Pods grouped per virtual machine |
 | `EMULATOR_TIME_COMPRESSION` | `60` | 1 real second = 60 emulated seconds |
 | Protection ratio | `0.2–0.8` | Dynamic fraction of pods that are spot vs. protected |
@@ -441,7 +435,7 @@ python3 New-Emulator/Emulator.py
 
 ## Component Interaction Diagram
 
-```
+```text
                   ┌─────────────┐
                   │  tasks.json │  (per workflow)
                   └──────┬──────┘
@@ -475,3 +469,5 @@ python3 New-Emulator/Emulator.py
 ```
 
 All five components share the same MySQL database. The Ranker and Checkpointer are offline planners that run before the experiment. The Emulator, Scaler, and Retry Service run concurrently during the experiment, coordinating through the database.
+
+`test_runner.py` lives in `test-runner/test_runner.py`.

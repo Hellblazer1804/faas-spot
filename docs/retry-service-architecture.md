@@ -106,7 +106,7 @@ kubectl get configmap -n retry retry-config -o yaml
 
 ### Manual ConfigMap Update
 ```bash
-kubectl patch configmap -n retry retry-config --patch '{"data":{"WORKFLOW_FILTER":"wf-5","BASELINE":"ours"}}'
+kubectl patch configmap -n retry retry-config --patch '{"data":{"WORKFLOW_FILTER":"wf-4","BASELINE":"ours"}}'
 kubectl rollout restart -n retry deployment/retry-service
 ```
 

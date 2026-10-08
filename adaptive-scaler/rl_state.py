@@ -114,7 +114,7 @@ class RLStateTracker:
         
         Uses workflow-specific cold start configuration:
         - Simple workflows (wf-1,2,3,4,7): Longer cold start to let retry service work
-        - Complex workflows (wf-5,6,8,9): Shorter cold start for faster intervention
+        - Complex workflows (wf-4,6,8,9): Shorter cold start for faster intervention
         """
         if self.cold_start_complete:
             return True

@@ -210,8 +210,8 @@ def test_integration():
     print("\nSimulating workflow run...")
     
     # Initialize
-    reset_state_tracker(workflow='wf-6', baseline='rl_test')
-    bandit = reset_bandit(workflow='wf-6', baseline='rl_test', load_saved=False)
+    reset_state_tracker(workflow='wf-5', baseline='rl_test')
+    bandit = reset_bandit(workflow='wf-5', baseline='rl_test', load_saved=False)
     
     # Simulate 10 ticks
     np.random.seed(123)
@@ -221,7 +221,7 @@ def test_integration():
     for tick in range(10):
         # Get context
         context = get_context_vector(
-            workflow_name='wf-6',
+            workflow_name='wf-5',
             baseline='rl_test',
             success_rate=success_rate,
             retry_exhausted_count=tick,
@@ -316,7 +316,7 @@ def main():
     if all_passed:
         print("\n🎉 All tests passed! RL modules are working correctly.")
         print("\nTo use RL mode, run the scaler with --rl-mode flag:")
-        print("  python preemptive_scaler.py --workflow wf-6 --rl-mode ...")
+        print("  python preemptive_scaler.py --workflow wf-5 --rl-mode ...")
         return 0
     else:
         print("\n⚠️ Some tests failed. Please check the errors above.")

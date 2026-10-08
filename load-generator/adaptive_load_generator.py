@@ -22,7 +22,7 @@ emulator_path = os.path.join(parent_dir, "New-Emulator", "Emulator.py")
 scaler_path = os.path.join(parent_dir, "Scaler", "preemptive_scaler.py")
 
 parser = argparse.ArgumentParser()
-wf_choices = ['wf-1', 'wf-2', 'wf-3', 'wf-4', 'wf-5', 'wf-6', 'wf-7', 'wf-8', 'wf-9']
+wf_choices = ['wf-1', 'wf-1', 'wf-2', 'wf-3', 'wf-4', 'wf-5', 'wf-6', 'wf-7', 'wf-8']
 parser.add_argument("--workflow", type=str, default="wf-1", choices=wf_choices)
 parser.add_argument("--max_requests", type=int, default=500)
 parser.add_argument("--burst_size", type=int, default=3)

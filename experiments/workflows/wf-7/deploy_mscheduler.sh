@@ -51,7 +51,7 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "3.238"
+  TASK_EXEC_TIME: "3.8926"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -68,9 +68,9 @@ data:
   MSCHED_PRICE_SPOT: "0.90"
 CMEOF
 
-echo "Creating function task1 (min=6, max=61) for baseline mscheduler..."
+echo "Creating function task1 (min=8, max=81) for baseline mscheduler..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-7-task1-mscheduler-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task1-mscheduler-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -90,7 +90,7 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "4.4246"
+  TASK_EXEC_TIME: "9.4007"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -107,9 +107,9 @@ data:
   MSCHED_PRICE_SPOT: "0.90"
 CMEOF
 
-echo "Creating function task2 (min=6, max=61) for baseline mscheduler..."
+echo "Creating function task2 (min=16, max=161) for baseline mscheduler..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-7-task2-mscheduler-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 16 --maxscale 161 --fntimeout 120 --method POST --configmap wf-7-task2-mscheduler-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -129,7 +129,7 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "16.2893"
+  TASK_EXEC_TIME: "13.2586"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -146,9 +146,9 @@ data:
   MSCHED_PRICE_SPOT: "0.90"
 CMEOF
 
-echo "Creating function task3 (min=2, max=21) for baseline mscheduler..."
+echo "Creating function task3 (min=8, max=81) for baseline mscheduler..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-7-task3-mscheduler-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task3-mscheduler-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -166,9 +166,9 @@ metadata:
 data:
   TASK_ID: "task4"
   WORKFLOW_ID: "wf-7"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "1.3634"
+  TASK_EXEC_TIME: "6.6016"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -185,11 +185,50 @@ data:
   MSCHED_PRICE_SPOT: "0.90"
 CMEOF
 
-echo "Creating function task4 (min=1, max=11) for baseline mscheduler..."
+echo "Creating function task4 (min=8, max=81) for baseline mscheduler..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-7-task4-mscheduler-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task4-mscheduler-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
+
+echo "Applying ConfigMap wf-7-task5-mscheduler-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-7-task5-mscheduler-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-7
+    task-id: task5
+    baseline: mscheduler
+data:
+  TASK_ID: "task5"
+  WORKFLOW_ID: "wf-7"
+  NEXT_TASK_URL: ""
+  BASELINE: "mscheduler"
+  TASK_EXEC_TIME: "9.2652"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  MSCHEDULER_ENABLED: "true"
+  MSCHEDULER_ENABLED: "true"
+  MSCHED_MAKESPAN_S: "900"
+  MSCHED_INTERVAL_S: "1800"
+  MSCHED_DUMP_S: "36.0"
+  MSCHED_OVERHEAD_SR: "1.0"
+  MSCHED_RESTORE_S: "36.0"
+  MSCHED_MIN_CKPTS: "1"
+  MSCHED_MIN_SPOT_SAVINGS: "0.65"
+  MSCHED_PRICE_OD: "3.00"
+  MSCHED_PRICE_SPOT: "0.90"
+CMEOF
+
+echo "Creating function task5 (min=2, max=21) for baseline mscheduler..."
+fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-7-task5-mscheduler-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task5"
 
 echo "Recreating route wf-7-route ..."
 fission route delete --name=wf-7-route -n $NS >/dev/null 2>&1 || true

@@ -50,7 +50,7 @@ data:
   WORKFLOW_ID: "wf-5"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "ours"
-  TASK_EXEC_TIME: "7.3230"
+  TASK_EXEC_TIME: "6.1787"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -58,9 +58,9 @@ data:
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task1 (min=2 max=201)..."
+echo "Creating function task1 (min=8 max=801)..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 201 --fntimeout 900 --method POST --configmap wf-5-task1-ours-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 801 --fntimeout 900 --method POST --configmap wf-5-task1-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -80,7 +80,7 @@ data:
   WORKFLOW_ID: "wf-5"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "ours"
-  TASK_EXEC_TIME: "20.8676"
+  TASK_EXEC_TIME: "9.3052"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -88,9 +88,9 @@ data:
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task2 (min=6 max=601)..."
+echo "Creating function task2 (min=8 max=801)..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 601 --fntimeout 900 --method POST --configmap wf-5-task2-ours-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 801 --fntimeout 900 --method POST --configmap wf-5-task2-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -110,7 +110,7 @@ data:
   WORKFLOW_ID: "wf-5"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "ours"
-  TASK_EXEC_TIME: "17.1266"
+  TASK_EXEC_TIME: "9.9007"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -118,9 +118,9 @@ data:
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task3 (min=6 max=601)..."
+echo "Creating function task3 (min=2 max=201)..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 601 --fntimeout 900 --method POST --configmap wf-5-task3-ours-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 201 --fntimeout 900 --method POST --configmap wf-5-task3-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -140,7 +140,7 @@ data:
   WORKFLOW_ID: "wf-5"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "ours"
-  TASK_EXEC_TIME: "26.1833"
+  TASK_EXEC_TIME: "2.9745"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -148,9 +148,9 @@ data:
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task4 (min=6 max=601)..."
+echo "Creating function task4 (min=8 max=801)..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 601 --fntimeout 900 --method POST --configmap wf-5-task4-ours-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 801 --fntimeout 900 --method POST --configmap wf-5-task4-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
 
@@ -170,7 +170,7 @@ data:
   WORKFLOW_ID: "wf-5"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task6"
   BASELINE: "ours"
-  TASK_EXEC_TIME: "20.2225"
+  TASK_EXEC_TIME: "6.6828"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -178,9 +178,9 @@ data:
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task5 (min=6 max=601)..."
+echo "Creating function task5 (min=8 max=801)..."
 fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 601 --fntimeout 900 --method POST --configmap wf-5-task5-ours-cfg -n $NS
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 801 --fntimeout 900 --method POST --configmap wf-5-task5-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task5"
 
@@ -198,9 +198,9 @@ metadata:
 data:
   TASK_ID: "task6"
   WORKFLOW_ID: "wf-5"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task7"
+  NEXT_TASK_URL: ""
   BASELINE: "ours"
-  TASK_EXEC_TIME: "6.3713"
+  TASK_EXEC_TIME: "14.5654"
   IS_CHECKPOINT: "false"
   CKPT_LEVEL: "1"
   SCALE_FACTOR: "1.0"
@@ -213,96 +213,6 @@ fission fn delete --name task6 -n $NS >/dev/null 2>&1 || true
 fission fn create --name task6 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 201 --fntimeout 900 --method POST --configmap wf-5-task6-ours-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task6"
-
-echo "Applying ConfigMap wf-5-task7-ours-cfg for task7..."
-kubectl -n $NS apply -f - <<CMEOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wf-5-task7-ours-cfg
-  labels:
-    app: serverless-wf
-    wf-id: wf-5
-    task-id: task7
-    baseline: ours
-data:
-  TASK_ID: "task7"
-  WORKFLOW_ID: "wf-5"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task8"
-  BASELINE: "ours"
-  TASK_EXEC_TIME: "3.3124"
-  IS_CHECKPOINT: "false"
-  CKPT_LEVEL: "1"
-  SCALE_FACTOR: "1.0"
-  AZ: "us-west-2a"
-  INSTANCE_TYPE: "v100"
-CMEOF
-
-echo "Creating function task7 (min=1 max=101)..."
-fission fn delete --name task7 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task7 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 101 --fntimeout 900 --method POST --configmap wf-5-task7-ours-cfg -n $NS
-sleep 3
-wait_rollout_for_task "task7"
-
-echo "Applying ConfigMap wf-5-task8-ours-cfg for task8..."
-kubectl -n $NS apply -f - <<CMEOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wf-5-task8-ours-cfg
-  labels:
-    app: serverless-wf
-    wf-id: wf-5
-    task-id: task8
-    baseline: ours
-data:
-  TASK_ID: "task8"
-  WORKFLOW_ID: "wf-5"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task9"
-  BASELINE: "ours"
-  TASK_EXEC_TIME: "2.2260"
-  IS_CHECKPOINT: "false"
-  CKPT_LEVEL: "1"
-  SCALE_FACTOR: "1.0"
-  AZ: "us-west-2a"
-  INSTANCE_TYPE: "v100"
-CMEOF
-
-echo "Creating function task8 (min=1 max=101)..."
-fission fn delete --name task8 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task8 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 101 --fntimeout 900 --method POST --configmap wf-5-task8-ours-cfg -n $NS
-sleep 3
-wait_rollout_for_task "task8"
-
-echo "Applying ConfigMap wf-5-task9-ours-cfg for task9..."
-kubectl -n $NS apply -f - <<CMEOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wf-5-task9-ours-cfg
-  labels:
-    app: serverless-wf
-    wf-id: wf-5
-    task-id: task9
-    baseline: ours
-data:
-  TASK_ID: "task9"
-  WORKFLOW_ID: "wf-5"
-  NEXT_TASK_URL: ""
-  BASELINE: "ours"
-  TASK_EXEC_TIME: "1.8400"
-  IS_CHECKPOINT: "false"
-  CKPT_LEVEL: "1"
-  SCALE_FACTOR: "1.0"
-  AZ: "us-west-2a"
-  INSTANCE_TYPE: "v100"
-CMEOF
-
-echo "Creating function task9 (min=1 max=101)..."
-fission fn delete --name task9 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task9 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 101 --fntimeout 900 --method POST --configmap wf-5-task9-ours-cfg -n $NS
-sleep 3
-wait_rollout_for_task "task9"
 
 echo "Recreating route wf-5-route -> task1 ..."
 fission route delete --name=wf-5-route -n $NS >/dev/null 2>&1 || true

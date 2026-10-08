@@ -59,24 +59,10 @@ DRY_RUN_RETRY_DELAY     = 10
 SUCCESS_RATE_MAX_RETRIES = 3
 SUCCESS_RATE_RETRY_DELAY = 30
 
-# Workflow classifications based on DAG depth and complexity
-# Simple workflows (wf-1, wf-2, wf-3, wf-4, wf-7): Shallow DAGs, fewer dependencies
-# Complex workflows (wf-5, wf-6, wf-8, wf-9): Deeper DAGs, more dependencies, bottlenecks
-SIMPLE_WORKFLOWS = {'wf-1', 'wf-2', 'wf-3', 'wf-4', 'wf-7'}
-COMPLEX_WORKFLOWS = {'wf-5', 'wf-6', 'wf-8', 'wf-9'}
+WF_TARGET_SUCCESS_RATE = float(os.getenv('WF_TARGET_SUCCESS_RATE', '0.85')) * 100  # stored as percentage here
 
-# Target success rates (aligned with scaler and retry service)
-# Simple workflows: target 95-100% (use 97.5% as midpoint)
-# Complex workflows: target 65-70% (use 67.5% as midpoint)
-SIMPLE_WORKFLOW_TARGET_SUCCESS_RATE = 97.5  # Percentage
-COMPLEX_WORKFLOW_TARGET_SUCCESS_RATE = 67.5  # Percentage
-
-def get_target_success_rate(workflow_name: str) -> float:
-    """Get target success rate for a workflow based on its complexity."""
-    if workflow_name in COMPLEX_WORKFLOWS:
-        return COMPLEX_WORKFLOW_TARGET_SUCCESS_RATE
-    else:
-        return SIMPLE_WORKFLOW_TARGET_SUCCESS_RATE
+def get_target_success_rate(workflow_name: str = None) -> float:
+    return WF_TARGET_SUCCESS_RATE
 
 # -----------------------------
 # Cost Calculation from Database (same as scaler)
@@ -89,20 +75,9 @@ EMULATOR_TIME_COMPRESSION = 60
 
 # Budget as percentage of on-demand cost
 # Updated: 50% hard cap includes all costs (scaling, retry, churn)
-# Exception: wf-5 and wf-9 get 60% base (adaptive in scaler)
-BUDGET_DEFAULT_PERCENT = 0.50  # 50% of on-demand (default for most workflows)
-
-# Per-workflow budget overrides (complex workflows get more headroom)
-WORKFLOW_BUDGET_PERCENT = {
-    'wf-5': 0.60,  # 60% base - complex deep DAG, adaptive scaler may boost
-    'wf-9': 0.60,  # 60% base - most complex workflow, adaptive scaler may boost
-    # All other workflows use BUDGET_DEFAULT_PERCENT (50%)
-}
-
-# Churn overhead: Previously used to account for pod respawning after emulator kills pods
-# Now set to 1.0 because budget cap already includes all costs
-# Must match scaler's CHURN_OVERHEAD_FACTOR for consistent budget calculations
-CHURN_OVERHEAD_FACTOR = 1.0  # No additional overhead
+# Exception: wf-4 and wf-8 get 60% base (adaptive in scaler)
+WF_BUDGET_PERCENT  = float(os.getenv('WF_BUDGET_PERCENT', '0.50'))
+CHURN_OVERHEAD_FACTOR = 1.0
 
 # RL Adaptive Scaler mode (contextual bandit for scaling decisions)
 # Cold start and activation settings are now workflow-specific in rl_config.py
@@ -475,20 +450,20 @@ def get_budget_for_workflow(workflow_name: str, az: str = "us-west-2a", instance
         # Based on actual observed experiment runtimes from run8.log
         # Load generator: 500 requests, concurrency=4, interval=0.25s, up to 60s timeout per request
         'wf-1': 1.00,    # Simple: observed 3539s = 59 min (was 0.25)
-        'wf-2': 1.75,    # Simple with branches: observed 6211s = 103 min (was 0.33)
-        'wf-3': 1.65,    # Medium: observed 5820s = 97 min (was 0.50)
-        'wf-4': 1.85,    # Medium: observed 6527s = 109 min (was 0.50)
-        'wf-5': 2.10,    # Complex: observed 7363s = 123 min (was 1.60)
-        'wf-6': 1.50,    # Complex: ~90 real minutes estimated
-        'wf-7': 1.00,    # Medium: ~60 real minutes estimated
-        'wf-8': 1.50,    # Complex: ~90 real minutes estimated
-        'wf-9': 2.00,    # Most complex: ~120 real minutes estimated
+        'wf-1': 1.75,    # Simple with branches: observed 6211s = 103 min (was 0.33)
+        'wf-2': 1.65,    # Medium: observed 5820s = 97 min (was 0.50)
+        'wf-3': 1.85,    # Medium: observed 6527s = 109 min (was 0.50)
+        'wf-4': 2.10,    # Complex: observed 7363s = 123 min (was 1.60)
+        'wf-5': 1.50,    # Complex: ~90 real minutes estimated
+        'wf-6': 1.00,    # Medium: ~60 real minutes estimated
+        'wf-7': 1.50,    # Complex: ~90 real minutes estimated
+        'wf-8': 2.00,    # Most complex: ~120 real minutes estimated
     }
     
     # Estimated machines per workflow (from tasks.json minscale / 3)
     WORKFLOW_ESTIMATED_MACHINES = {
-        'wf-1': 2, 'wf-2': 3, 'wf-3': 4, 'wf-4': 4,
-        'wf-5': 11, 'wf-6': 12, 'wf-7': 5, 'wf-8': 14, 'wf-9': 16
+        'wf-1': 2, 'wf-1': 3, 'wf-2': 4, 'wf-3': 4,
+        'wf-4': 11, 'wf-5': 12, 'wf-6': 5, 'wf-7': 14, 'wf-8': 16
     }
     
     # Load on-demand price from spot cost CSV
@@ -513,8 +488,7 @@ def get_budget_for_workflow(workflow_name: str, az: str = "us-west-2a", instance
     runtime_hours = WORKFLOW_ESTIMATED_RUNTIME_HOURS.get(workflow_name, 0.15)
     estimated_machines = WORKFLOW_ESTIMATED_MACHINES.get(workflow_name, 6)
     
-    # Get per-workflow budget percentage (wf-5, wf-9 get 60%, others get 50%)
-    budget_percent = WORKFLOW_BUDGET_PERCENT.get(workflow_name, BUDGET_DEFAULT_PERCENT)
+    budget_percent = WF_BUDGET_PERCENT
     override_percent = get_budget_override_percent(workflow_name)
     if override_percent is not None:
         budget_percent = override_percent
@@ -768,9 +742,9 @@ def dry_run_workflow(workflow_id, tasks_data, max_retries=3, retry_delay=10):
     route_url = f"{ROUTER_ENTRY_URL}/{workflow_id}"
 
     # For workflows with longer execution times, use longer timeout
-    # wf-9 is the longest workflow (~33s path), wf-3/4/5 also have long execution times
-    # Complex workflows (wf-5,6,8,9) have deeper DAGs and may need more time
-    workflows_with_long_tasks = {'wf-3', 'wf-4', 'wf-5', 'wf-6', 'wf-8', 'wf-9'}
+    # wf-8 is the longest workflow (~33s path), wf-2/4/5 also have long execution times
+    # Complex workflows (wf-4,6,8,9) have deeper DAGs and may need more time
+    workflows_with_long_tasks = {'wf-2', 'wf-3', 'wf-4', 'wf-5', 'wf-7', 'wf-8'}
     timeout = 1200 if workflow_id in workflows_with_long_tasks else 900  # 20 min for long/complex tasks, 15 min default
     
     # Find the final/exit tasks in the workflow (tasks with no successors)
@@ -1116,8 +1090,8 @@ def apply_checkpoint_plan_to_configmaps(workflow, baseline, checkpoint_tasks, na
             print(f"  ⚠️ Timeout waiting for rollouts to complete (waited {max_wait}s), but continuing...")
         
         # Additional stabilization wait for all workflows (pods need time to be ready to serve traffic)
-        # For longest workflows (wf-9), wait longer since they have more tasks and longer execution times
-        longest_workflows = {'wf-9'}  # wf-9 has longest path (~33s) and most tasks
+        # For longest workflows (wf-8), wait longer since they have more tasks and longer execution times
+        longest_workflows = {'wf-8'}  # wf-8 has longest path (~33s) and most tasks
         wait_time = 20 if workflow in longest_workflows else 10
         print(f"⏳ Waiting {wait_time}s for pods to be ready to serve traffic...")
         time.sleep(wait_time)
@@ -1193,7 +1167,7 @@ def main():
     parser.add_argument('--workflow', type=str, help='Specific workflow to dry run (e.g., wf-1)')
     parser.add_argument('--function', type=str, help='Specific function to dry run (requires --workflow)')
     parser.add_argument('--workflows', nargs='*', default=None,
-                        help='Workflows to run (e.g. wf-1 wf-5 wf-9). Default: all wf-* with tasks.json')
+                        help='Workflows to run (e.g. wf-1 wf-4 wf-8). Default: all wf-* with tasks.json')
     args = parser.parse_args()
     
     if IGNORE_SIGHUP:
@@ -1220,7 +1194,7 @@ def main():
 
     all_workflows = sorted([d for d in os.listdir(WORKFLOWS_DIR)
                             if d.startswith("wf-") and os.path.exists(os.path.join(WORKFLOWS_DIR, d, "tasks.json"))])
-    _excluded_workflows = {'wf-4', 'wf-5'}
+    _excluded_workflows = {'wf-3', 'wf-4'}
     _default_workflows = [wf for wf in all_workflows if wf not in _excluded_workflows]
     workflows_to_run = args.workflows if args.workflows else _default_workflows
     if not workflows_to_run:
@@ -1231,13 +1205,13 @@ def main():
             print(f"⚠️ Unknown workflow(s) {invalid}; available: {all_workflows}. Skipping invalid.")
         workflows_to_run = [wf for wf in workflows_to_run if wf in all_workflows]
     if not workflows_to_run:
-        workflows_to_run = ['wf-4', 'wf-5']
+        workflows_to_run = ['wf-3', 'wf-4']
     total_experiments = len(workflows_to_run)
     current_experiment_count = 0
     start_time = time.time()
     
     print(f"\n{'='*20} PERFORMING INITIAL BLANKET CLEANUP {'='*20}")
-    print(f"🎯 Target success rates: Simple workflows = {SIMPLE_WORKFLOW_TARGET_SUCCESS_RATE}%, Complex workflows = {COMPLEX_WORKFLOW_TARGET_SUCCESS_RATE}%")
+    print(f"🎯 Target success rate: {WF_TARGET_SUCCESS_RATE:.1f}%")
     print(f"🏷️ Experiment tag: {EXPERIMENT_TAG}")
     ensure_metadata_columns()
     if discord_notifier: discord_notifier.notify_stage("Global", "Global", "Initial Cleanup", "Starting blanket cleanup of all resources.")
@@ -1300,10 +1274,10 @@ def main():
                 # 2.6) Retry service will be started as background process later (after emulator/scaler)
 
                 # 3) Optional workflow dry run
-                # For workflows with longer execution times (wf-3, wf-4, wf-5), use longer retry delays
+                # For workflows with longer execution times (wf-2, wf-3, wf-4), use longer retry delays
                 # These workflows have tasks that take 2-4 seconds each, so pods need more time to stabilize
-                # wf-9 is the longest workflow (~33s path), wf-3/4/5 also have long execution times
-                workflows_with_long_tasks = {'wf-3', 'wf-4', 'wf-5', 'wf-9'}
+                # wf-8 is the longest workflow (~33s path), wf-2/4/5 also have long execution times
+                workflows_with_long_tasks = {'wf-2', 'wf-3', 'wf-4', 'wf-8'}
                 dry_run_retry_delay = DRY_RUN_RETRY_DELAY * 2 if wf in workflows_with_long_tasks else DRY_RUN_RETRY_DELAY
                 
                 print(f"🧪 Performing dry run test for {wf}...")
@@ -1366,8 +1340,8 @@ def main():
                                     if ck_tasks:
                                         apply_checkpoint_plan_to_configmaps(wf, BASELINE, ck_tasks, namespace=NAMESPACE, checkpoint_levels=ck_levels)
                                     # Re-run dry run with appropriate delay for long-running workflows
-                                    # wf-9 is the longest workflow (~33s path), wf-3/4/5 also have long execution times
-                                    workflows_with_long_tasks = {'wf-3', 'wf-4', 'wf-5', 'wf-9'}
+                                    # wf-8 is the longest workflow (~33s path), wf-2/4/5 also have long execution times
+                                    workflows_with_long_tasks = {'wf-2', 'wf-3', 'wf-4', 'wf-8'}
                                     dry_run_retry_delay = DRY_RUN_RETRY_DELAY * 2 if wf in workflows_with_long_tasks else DRY_RUN_RETRY_DELAY
                                     print(f"🔄 Re-running dry run after redeploy...")
                                     _ = dry_run_workflow(wf, tasks_data, DRY_RUN_MAX_RETRIES, dry_run_retry_delay)
@@ -1427,26 +1401,26 @@ def main():
                 # Enhanced scaler with success rate monitoring and critical task scaling
                 # Cost optimization: Add max-scale and cooldown based on workflow type
                 # Simple workflows (wf-1,2,3,4,7): Target 95-100% - need aggressive scaling
-                # Complex workflows (wf-5,6,8,9): Target 65-70% - deeper DAGs, bottlenecks
+                # Complex workflows (wf-4,6,8,9): Target 65-70% - deeper DAGs, bottlenecks
                 
                 # For complex workflows (longer execution, deeper DAGs), use MODERATE limits
                 # REDUCED from previous values to prevent runaway costs
                 # These limits are now in line with the scaler's hard caps (5x base, 50 max per task)
-                if wf in COMPLEX_WORKFLOWS:
-                    if wf in ['wf-5', 'wf-9']:  # Longest workflows
+                if True:
+                    if wf in ['wf-4', 'wf-8']:  # Longest workflows
                         max_scale_limit = "350"  # Restored for success rate (was 500)
-                    elif wf == 'wf-8':
+                    elif wf == 'wf-7':
                         max_scale_limit = "300"  # Restored (was 450)
-                    elif wf == 'wf-6':
+                    elif wf == 'wf-5':
                         max_scale_limit = "280"  # Restored (was 400)
                     else:
                         max_scale_limit = "250"
                     scale_cooldown = "120"
-                elif wf in SIMPLE_WORKFLOWS:
+                elif False:
                     # Simple workflows: sufficient limits for high targets
-                    if wf == 'wf-3':
+                    if wf == 'wf-2':
                         max_scale_limit = "200"  # Restored (was 350)
-                    elif wf in ['wf-2', 'wf-4', 'wf-7']:
+                    elif wf in ['wf-1', 'wf-3', 'wf-6']:
                         max_scale_limit = "180"  # Restored (was 300)
                     else:  # wf-1
                         max_scale_limit = "150"  # Restored (was 250)
@@ -1502,7 +1476,7 @@ def main():
                 
                 # Complex workflows need more aggressive retrying (shorter cooldown, faster polling)
                 # since they have deeper DAGs and more failure points
-                if wf in COMPLEX_WORKFLOWS:
+                if True:
                     retry_poll = "15"      # Faster polling for complex workflows
                     retry_cooldown = "45"  # Shorter cooldown to retry faster
                 else:

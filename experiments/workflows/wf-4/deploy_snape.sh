@@ -51,7 +51,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "snape"
-  TASK_EXEC_TIME: "8.2481"
+  TASK_EXEC_TIME: "9.6951"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -61,9 +61,9 @@ data:
   SNAPE_MAX_OD_RATIO: "1.0"
 CMEOF
 
-echo "Creating function task1 (min=3, max=31) for baseline snape..."
+echo "Creating function task1 (min=2, max=21) for baseline snape..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task1-snape-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task1-snape-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -83,7 +83,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "snape"
-  TASK_EXEC_TIME: "12.9115"
+  TASK_EXEC_TIME: "22.2126"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -93,9 +93,9 @@ data:
   SNAPE_MAX_OD_RATIO: "1.0"
 CMEOF
 
-echo "Creating function task2 (min=2, max=21) for baseline snape..."
+echo "Creating function task2 (min=6, max=61) for baseline snape..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task2-snape-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task2-snape-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -115,7 +115,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "snape"
-  TASK_EXEC_TIME: "6.224"
+  TASK_EXEC_TIME: "16.4318"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -125,9 +125,9 @@ data:
   SNAPE_MAX_OD_RATIO: "1.0"
 CMEOF
 
-echo "Creating function task3 (min=3, max=31) for baseline snape..."
+echo "Creating function task3 (min=6, max=61) for baseline snape..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task3-snape-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task3-snape-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -145,9 +145,9 @@ metadata:
 data:
   TASK_ID: "task4"
   WORKFLOW_ID: "wf-4"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "snape"
-  TASK_EXEC_TIME: "7.8318"
+  TASK_EXEC_TIME: "16.2145"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -157,11 +157,171 @@ data:
   SNAPE_MAX_OD_RATIO: "1.0"
 CMEOF
 
-echo "Creating function task4 (min=3, max=31) for baseline snape..."
+echo "Creating function task4 (min=6, max=61) for baseline snape..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task4-snape-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task4-snape-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
+
+echo "Applying ConfigMap wf-4-task5-snape-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task5-snape-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task5
+    baseline: snape
+data:
+  TASK_ID: "task5"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task6"
+  BASELINE: "snape"
+  TASK_EXEC_TIME: "26.5062"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  SNAPE_ENABLED: "true"
+  SNAPE_TARGET_AVAIL: "0.9996"
+  SNAPE_MIN_OD_RATIO: "0.0"
+  SNAPE_MAX_OD_RATIO: "1.0"
+CMEOF
+
+echo "Creating function task5 (min=6, max=61) for baseline snape..."
+fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task5-snape-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task5"
+
+echo "Applying ConfigMap wf-4-task6-snape-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task6-snape-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task6
+    baseline: snape
+data:
+  TASK_ID: "task6"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task7"
+  BASELINE: "snape"
+  TASK_EXEC_TIME: "6.742"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  SNAPE_ENABLED: "true"
+  SNAPE_TARGET_AVAIL: "0.9996"
+  SNAPE_MIN_OD_RATIO: "0.0"
+  SNAPE_MAX_OD_RATIO: "1.0"
+CMEOF
+
+echo "Creating function task6 (min=2, max=21) for baseline snape..."
+fission fn delete --name task6 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task6 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task6-snape-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task6"
+
+echo "Applying ConfigMap wf-4-task7-snape-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task7-snape-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task7
+    baseline: snape
+data:
+  TASK_ID: "task7"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task8"
+  BASELINE: "snape"
+  TASK_EXEC_TIME: "4.0415"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  SNAPE_ENABLED: "true"
+  SNAPE_TARGET_AVAIL: "0.9996"
+  SNAPE_MIN_OD_RATIO: "0.0"
+  SNAPE_MAX_OD_RATIO: "1.0"
+CMEOF
+
+echo "Creating function task7 (min=1, max=11) for baseline snape..."
+fission fn delete --name task7 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task7 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task7-snape-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task7"
+
+echo "Applying ConfigMap wf-4-task8-snape-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task8-snape-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task8
+    baseline: snape
+data:
+  TASK_ID: "task8"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task9"
+  BASELINE: "snape"
+  TASK_EXEC_TIME: "1.6676"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  SNAPE_ENABLED: "true"
+  SNAPE_TARGET_AVAIL: "0.9996"
+  SNAPE_MIN_OD_RATIO: "0.0"
+  SNAPE_MAX_OD_RATIO: "1.0"
+CMEOF
+
+echo "Creating function task8 (min=1, max=11) for baseline snape..."
+fission fn delete --name task8 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task8 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task8-snape-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task8"
+
+echo "Applying ConfigMap wf-4-task9-snape-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task9-snape-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task9
+    baseline: snape
+data:
+  TASK_ID: "task9"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: ""
+  BASELINE: "snape"
+  TASK_EXEC_TIME: "2.556"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  SNAPE_ENABLED: "true"
+  SNAPE_TARGET_AVAIL: "0.9996"
+  SNAPE_MIN_OD_RATIO: "0.0"
+  SNAPE_MAX_OD_RATIO: "1.0"
+CMEOF
+
+echo "Creating function task9 (min=1, max=11) for baseline snape..."
+fission fn delete --name task9 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task9 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task9-snape-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task9"
 
 echo "Recreating route wf-4-route ..."
 fission route delete --name=wf-4-route -n $NS >/dev/null 2>&1 || true

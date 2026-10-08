@@ -1,77 +1,124 @@
 {
   "task1": {
-    "exec_time": 1,
+    "exec_time": 2,
     "successors": [
       "task2"
     ],
-    "minscale": 8,
-    "scaling_factor": 1.02,
-    "is_scalable": true,
+    "minscale": 9,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
     "machine_ids": {
       "machine_1": 3,
       "machine_2": 3,
-      "machine_3": 2
+      "machine_3": 3
     },
-    "heft_rank": 14
+    "heft_rank": 33
   },
   "task2": {
     "exec_time": 3,
     "successors": [
       "task3"
     ],
-    "minscale": 16,
-    "scaling_factor": 1.02,
-    "is_scalable": true,
+    "minscale": 12,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
     "machine_ids": {
-      "machine_3": 1,
       "machine_4": 3,
       "machine_5": 3,
       "machine_6": 3,
-      "machine_7": 3,
-      "machine_8": 3
+      "machine_7": 3
     },
-    "heft_rank": 13
+    "heft_rank": 31
   },
   "task3": {
-    "exec_time": 4,
+    "exec_time": 6,
     "successors": [
       "task4"
     ],
-    "minscale": 8,
-    "scaling_factor": 1.01,
-    "is_scalable": true,
+    "minscale": 3,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
     "machine_ids": {
-      "machine_9": 3,
-      "machine_10": 3,
-      "machine_11": 2
+      "machine_8": 3
     },
-    "heft_rank": 10
+    "heft_rank": 28
   },
   "task4": {
-    "exec_time": 4,
+    "exec_time": 6,
     "successors": [
       "task5"
     ],
-    "minscale": 8,
-    "scaling_factor": 1.01,
-    "is_scalable": true,
+    "minscale": 3,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
     "machine_ids": {
-      "machine_11": 1,
-      "machine_12": 3,
-      "machine_13": 3,
-      "machine_14": 1
+      "machine_9": 3
     },
-    "heft_rank": 6
+    "heft_rank": 22
   },
   "task5": {
-    "exec_time": 2,
-    "successors": [],
-    "minscale": 2,
-    "scaling_factor": 1.01,
-    "is_scalable": true,
+    "exec_time": 4,
+    "successors": [
+      "task6"
+    ],
+    "minscale": 9,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
     "machine_ids": {
-      "machine_14": 2
+      "machine_10": 3,
+      "machine_11": 3,
+      "machine_12": 3
     },
-    "heft_rank": 2
+    "heft_rank": 16
+  },
+  "task6": {
+    "exec_time": 5,
+    "successors": [
+      "task7"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
+    "machine_ids": {
+      "machine_13": 3
+    },
+    "heft_rank": 12
+  },
+  "task7": {
+    "exec_time": 2,
+    "successors": [
+      "task8"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
+    "machine_ids": {
+      "machine_14": 3
+    },
+    "heft_rank": 7
+  },
+  "task8": {
+    "exec_time": 2,
+    "successors": [
+      "task9"
+    ],
+    "minscale": 3,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
+    "machine_ids": {
+      "machine_15": 3
+    },
+    "heft_rank": 5
+  },
+  "task9": {
+    "exec_time": 3,
+    "successors": [],
+    "minscale": 1,
+    "scaling_factor": 1.0,
+    "is_scalable": false,
+    "machine_ids": {
+      "machine_16": 1
+    },
+    "heft_rank": 3
   }
 }

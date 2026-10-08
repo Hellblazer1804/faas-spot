@@ -51,7 +51,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "ofp_tm"
-  TASK_EXEC_TIME: "6.5515"
+  TASK_EXEC_TIME: "4.5942"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -60,9 +60,9 @@ data:
   OFP_PRICE_OD: "3.00"
 CMEOF
 
-echo "Creating function task1 (min=3, max=31) for baseline ofp_tm..."
+echo "Creating function task1 (min=2, max=21) for baseline ofp_tm..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task1-ofp-tm-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task1-ofp-tm-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -82,7 +82,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "ofp_tm"
-  TASK_EXEC_TIME: "9.0303"
+  TASK_EXEC_TIME: "11.897"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -91,9 +91,9 @@ data:
   OFP_PRICE_OD: "3.00"
 CMEOF
 
-echo "Creating function task2 (min=2, max=21) for baseline ofp_tm..."
+echo "Creating function task2 (min=6, max=61) for baseline ofp_tm..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task2-ofp-tm-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task2-ofp-tm-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -113,7 +113,7 @@ data:
   WORKFLOW_ID: "wf-4"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "ofp_tm"
-  TASK_EXEC_TIME: "10.786"
+  TASK_EXEC_TIME: "8.6355"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -122,9 +122,9 @@ data:
   OFP_PRICE_OD: "3.00"
 CMEOF
 
-echo "Creating function task3 (min=3, max=31) for baseline ofp_tm..."
+echo "Creating function task3 (min=6, max=61) for baseline ofp_tm..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task3-ofp-tm-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task3-ofp-tm-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -142,9 +142,9 @@ metadata:
 data:
   TASK_ID: "task4"
   WORKFLOW_ID: "wf-4"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "ofp_tm"
-  TASK_EXEC_TIME: "6.9233"
+  TASK_EXEC_TIME: "10.1281"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -153,11 +153,166 @@ data:
   OFP_PRICE_OD: "3.00"
 CMEOF
 
-echo "Creating function task4 (min=3, max=31) for baseline ofp_tm..."
+echo "Creating function task4 (min=6, max=61) for baseline ofp_tm..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-4-task4-ofp-tm-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task4-ofp-tm-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
+
+echo "Applying ConfigMap wf-4-task5-ofp-tm-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task5-ofp-tm-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task5
+    baseline: ofp_tm
+data:
+  TASK_ID: "task5"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task6"
+  BASELINE: "ofp_tm"
+  TASK_EXEC_TIME: "13.3479"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  OFP_TM_ENABLED: "true"
+  OFP_PRICE_SPOT: "0.90"
+  OFP_PRICE_OD: "3.00"
+CMEOF
+
+echo "Creating function task5 (min=6, max=61) for baseline ofp_tm..."
+fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-4-task5-ofp-tm-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task5"
+
+echo "Applying ConfigMap wf-4-task6-ofp-tm-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task6-ofp-tm-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task6
+    baseline: ofp_tm
+data:
+  TASK_ID: "task6"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task7"
+  BASELINE: "ofp_tm"
+  TASK_EXEC_TIME: "3.8961"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  OFP_TM_ENABLED: "true"
+  OFP_PRICE_SPOT: "0.90"
+  OFP_PRICE_OD: "3.00"
+CMEOF
+
+echo "Creating function task6 (min=2, max=21) for baseline ofp_tm..."
+fission fn delete --name task6 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task6 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-4-task6-ofp-tm-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task6"
+
+echo "Applying ConfigMap wf-4-task7-ofp-tm-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task7-ofp-tm-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task7
+    baseline: ofp_tm
+data:
+  TASK_ID: "task7"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task8"
+  BASELINE: "ofp_tm"
+  TASK_EXEC_TIME: "1.8186"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  OFP_TM_ENABLED: "true"
+  OFP_PRICE_SPOT: "0.90"
+  OFP_PRICE_OD: "3.00"
+CMEOF
+
+echo "Creating function task7 (min=1, max=11) for baseline ofp_tm..."
+fission fn delete --name task7 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task7 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task7-ofp-tm-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task7"
+
+echo "Applying ConfigMap wf-4-task8-ofp-tm-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task8-ofp-tm-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task8
+    baseline: ofp_tm
+data:
+  TASK_ID: "task8"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task9"
+  BASELINE: "ofp_tm"
+  TASK_EXEC_TIME: "1.7086"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  OFP_TM_ENABLED: "true"
+  OFP_PRICE_SPOT: "0.90"
+  OFP_PRICE_OD: "3.00"
+CMEOF
+
+echo "Creating function task8 (min=1, max=11) for baseline ofp_tm..."
+fission fn delete --name task8 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task8 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task8-ofp-tm-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task8"
+
+echo "Applying ConfigMap wf-4-task9-ofp-tm-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-4-task9-ofp-tm-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-4
+    task-id: task9
+    baseline: ofp_tm
+data:
+  TASK_ID: "task9"
+  WORKFLOW_ID: "wf-4"
+  NEXT_TASK_URL: ""
+  BASELINE: "ofp_tm"
+  TASK_EXEC_TIME: "1.299"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  OFP_TM_ENABLED: "true"
+  OFP_PRICE_SPOT: "0.90"
+  OFP_PRICE_OD: "3.00"
+CMEOF
+
+echo "Creating function task9 (min=1, max=11) for baseline ofp_tm..."
+fission fn delete --name task9 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task9 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-4-task9-ofp-tm-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task9"
 
 echo "Recreating route wf-4-route ..."
 fission route delete --name=wf-4-route -n $NS >/dev/null 2>&1 || true

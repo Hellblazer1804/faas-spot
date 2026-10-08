@@ -51,7 +51,7 @@ data:
   WORKFLOW_ID: "wf-1"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "static_over_3x"
-  TASK_EXEC_TIME: "1.3909"
+  TASK_EXEC_TIME: "5.7289"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -79,7 +79,7 @@ data:
   WORKFLOW_ID: "wf-1"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "static_over_3x"
-  TASK_EXEC_TIME: "2.6655"
+  TASK_EXEC_TIME: "3.0614"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -105,9 +105,9 @@ metadata:
 data:
   TASK_ID: "task3"
   WORKFLOW_ID: "wf-1"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3a,http://router.fission.svc.cluster.local/fission-function/task3b"
   BASELINE: "static_over_3x"
-  TASK_EXEC_TIME: "2.8094"
+  TASK_EXEC_TIME: "14.0354"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -119,33 +119,117 @@ fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executort
 sleep 3
 wait_rollout_for_task "task3"
 
-echo "Applying ConfigMap wf-1-task4-static-over-3x-cfg..."
+echo "Applying ConfigMap wf-1-task3a-static-over-3x-cfg..."
 kubectl -n $NS apply -f - <<CMEOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wf-1-task4-static-over-3x-cfg
+  name: wf-1-task3a-static-over-3x-cfg
   labels:
     app: serverless-wf
     wf-id: wf-1
-    task-id: task4
+    task-id: task3a
     baseline: static_over_3x
 data:
-  TASK_ID: "task4"
+  TASK_ID: "task3a"
   WORKFLOW_ID: "wf-1"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/taskr1"
   BASELINE: "static_over_3x"
-  TASK_EXEC_TIME: "4.0219"
+  TASK_EXEC_TIME: "1.9998"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task4 (min=3, max=31) for baseline static_over_3x..."
-fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-1-task4-static-over-3x-cfg -n $NS
+echo "Creating function task3a (min=3, max=31) for baseline static_over_3x..."
+fission fn delete --name task3a -n $NS >/dev/null 2>&1 || true
+fission fn create --name task3a --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-1-task3a-static-over-3x-cfg -n $NS
 sleep 3
-wait_rollout_for_task "task4"
+wait_rollout_for_task "task3a"
+
+echo "Applying ConfigMap wf-1-task3b-static-over-3x-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-task3b-static-over-3x-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: task3b
+    baseline: static_over_3x
+data:
+  TASK_ID: "task3b"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/taskr2"
+  BASELINE: "static_over_3x"
+  TASK_EXEC_TIME: "2.5419"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function task3b (min=3, max=31) for baseline static_over_3x..."
+fission fn delete --name task3b -n $NS >/dev/null 2>&1 || true
+fission fn create --name task3b --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-1-task3b-static-over-3x-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task3b"
+
+echo "Applying ConfigMap wf-1-taskr1-static-over-3x-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-taskr1-static-over-3x-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: taskr1
+    baseline: static_over_3x
+data:
+  TASK_ID: "taskr1"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: ""
+  BASELINE: "static_over_3x"
+  TASK_EXEC_TIME: "3.2985"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function taskr1 (min=3, max=31) for baseline static_over_3x..."
+fission fn delete --name taskr1 -n $NS >/dev/null 2>&1 || true
+fission fn create --name taskr1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-1-taskr1-static-over-3x-cfg -n $NS
+sleep 3
+wait_rollout_for_task "taskr1"
+
+echo "Applying ConfigMap wf-1-taskr2-static-over-3x-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-taskr2-static-over-3x-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: taskr2
+    baseline: static_over_3x
+data:
+  TASK_ID: "taskr2"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: ""
+  BASELINE: "static_over_3x"
+  TASK_EXEC_TIME: "1.4642"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function taskr2 (min=3, max=31) for baseline static_over_3x..."
+fission fn delete --name taskr2 -n $NS >/dev/null 2>&1 || true
+fission fn create --name taskr2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-1-taskr2-static-over-3x-cfg -n $NS
+sleep 3
+wait_rollout_for_task "taskr2"
 
 echo "Recreating route wf-1-route ..."
 fission route delete --name=wf-1-route -n $NS >/dev/null 2>&1 || true

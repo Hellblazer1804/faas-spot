@@ -37,12 +37,8 @@ BOT_INITIAL_CREDITS = 100.0  # Starting CPU credits
 BOT_CREDIT_EARN_RATE = 5.0   # Credits earned per minute at baseline
 BOT_CREDIT_BURST_COST = 20.0  # Credits consumed per burst minute
 BOT_MIN_CREDITS_FOR_BURST = 30.0  # Minimum credits to allow bursting
-BOT_HIBERNATION_THRESHOLD = 0.90  # Hibernate when workflow completion < 90%
-BOT_CHECKPOINT_THRESHOLD = 0.95  # Checkpoint when workflow completion < 95%
-# Probabilistic placement: proactively place risky tasks on burstable
-BOT_PROACTIVE_BURSTABLE_THRESHOLD = 0.5  # Start on burstable if survival for task duration < 50%
-# Credit exhaustion: fall back to on-demand when credits depleted
-BOT_CREDIT_EXHAUSTION_THRESHOLD = 10.0  # Switch to on-demand pricing when credits < 10
+BOT_HIBERNATION_THRESHOLD = 0.4  # Hibernate when survival < 40%
+BOT_CHECKPOINT_THRESHOLD = 0.6  # Checkpoint when survival < 60%
 
 # Global credit tracking per pod
 POD_CREDIT_CACHE: Dict[str, float] = {}
@@ -226,18 +222,13 @@ def hourglass_get_workflow_deadline(workflow: str, task_id: str, total_exec_time
     """
     Calculate workflow deadline (Hourglass paper Section 4.1).
     Deadline = workflow_start_time + (critical_path_time * DEADLINE_FACTOR)
-    
-    IMPORTANT: Only consider RECENT entries (last 30 minutes) to avoid using
-    stale data from previous experiment runs.
     """
     try:
         conn = mysql_connection()
         cursor = conn.cursor()
-        # Get workflow start time from RECENT task executions only
+        # Get workflow start time from first task execution
         cursor.execute(
-            """SELECT MIN(start_time) FROM serverless_workflows 
-               WHERE workflow_name = %s 
-               AND start_time > (UNIX_TIMESTAMP() - 1800)""",  # Last 30 minutes
+            "SELECT MIN(start_time) FROM serverless_workflows WHERE workflow_name = %s",
             (workflow,)
         )
         result = cursor.fetchone()
@@ -667,30 +658,12 @@ def main():
 
     # ==========================================================================
     # BAG-OF-TASKS BASELINE (IEEE TCC 2023)
-    # Burstable VM scheduling with spot hibernation + probabilistic placement
+    # Burstable VM scheduling with spot hibernation
     # ==========================================================================
     elif bag_ckpt_strategy == "probabilistic":
         cdf = load_cdf_from_db(AZ, INSTANCE_TYPE)
         age_min = (time.time() - pod_start_time) / 60.0
         survival_prob = get_survival_prob(cdf, age_min + TASK_EXEC_MINUTES)
-        
-        # Calculate survival for task duration (for logging)
-        task_duration_survival = get_survival_prob(cdf, TASK_EXEC_MINUTES)
-        
-        # Calculate WORKFLOW COMPLETION probability
-        # KEY FIX: Use survival_prob (which includes pod age) not task_duration_survival
-        # The CDF has minimum lifetime of ~10 min, so short tasks always return 1.0
-        # But pod age accumulates, so survival_prob decreases over time
-        total_tasks = int(read_cfg("TOTAL_WORKFLOW_TASKS", "6"))  # Default 6 tasks
-        try:
-            current_task_num = int(task_id.replace("task", "")) if task_id else 1
-        except:
-            current_task_num = 1
-        remaining_tasks = max(1, total_tasks - current_task_num + 1)
-        
-        # Workflow completion probability: use survival_prob (accounts for pod age!)
-        # This ensures older pods have lower completion probability
-        workflow_completion_prob = survival_prob ** remaining_tasks
         
         # Check for hibernated state to resume
         resumed_state = bot_resume_state(workflow, task_id, uid)
@@ -702,54 +675,21 @@ def main():
         
         details.update({
             "survival_probability": round(survival_prob, 4),
-            "task_duration_survival": round(task_duration_survival, 4),
-            "workflow_completion_prob": round(workflow_completion_prob, 4),
-            "remaining_tasks": remaining_tasks,
             "cpu_credits": round(credits, 2),
             "can_burst": can_burst,
             "resumed_from_hibernation": resumed_state is not None
         })
         
-        # ==========================================================================
-        # VM TYPE DETERMINATION
-        # Philosophy: Always START on SPOT (cheap), migrate to burstable via hibernation
-        # Only use burstable if resumed from hibernation, never proactively
-        # This maximizes cost savings while using hibernation for protection
-        # ==========================================================================
-        vm_type = "spot"  # Always start on spot
+        # Bag-of-Tasks: ALL tasks run on burstable VMs (T2/T3 instances)
+        # This is the core design principle - burstable VMs provide reliability at lower cost
+        # Mark ALL tasks as burstable so Emulator knows not to preempt them
+        details["burst_used"] = True  # Always true for BoT - we're on burstable VMs
+        details["is_burstable_vm"] = True  # Explicit flag for Emulator
         
-        if resumed_state is not None:
-            # Resumed from hibernation → BURSTABLE VM (protected)
-            vm_type = "burstable"
-            details["placement_reason"] = "resumed_from_hibernation"
-            print(f"🛡️ [BoT] Running on BURSTABLE VM (resumed from hibernation)")
-        else:
-            # Default: start on SPOT (cheap, can be preempted)
-            # Migration to burstable happens via hibernation when completion_prob drops
-            vm_type = "spot"
-            details["placement_reason"] = "default_spot"
-            print(f"⚡ [BoT] Running on SPOT VM (survival={survival_prob:.2f}, workflow_completion={workflow_completion_prob:.2f})")
-        
-        # Check for credit exhaustion on burstable → fall back to on-demand
-        if vm_type == "burstable" and credits < BOT_CREDIT_EXHAUSTION_THRESHOLD:
-            vm_type = "on-demand"
-            details["placement_reason"] = "credit_exhaustion"
-            print(f"💸 [BoT] Credits exhausted ({credits:.1f} < {BOT_CREDIT_EXHAUSTION_THRESHOLD}) → ON-DEMAND fallback")
-        
-        # Set flags based on VM type
-        details["vm_type"] = vm_type
-        details["burst_used"] = (vm_type == "burstable")
-        details["is_burstable_vm"] = (vm_type == "burstable")
-        details["is_on_demand"] = (vm_type == "on-demand")
-        
-        # ==========================================================================
-        # SCHEDULING DECISION (hibernate, checkpoint, or normal)
-        # KEY: Use workflow_completion_prob for decisions (accounts for remaining tasks)
-        # ==========================================================================
-        if workflow_completion_prob < BOT_HIBERNATION_THRESHOLD and vm_type == "spot":
-            # Low workflow completion probability on SPOT → hibernate for migration to burstable
-            # This triggers even for short tasks if many tasks remain
-            print(f"💤 [BoT] Low completion prob ({workflow_completion_prob:.2f} < {BOT_HIBERNATION_THRESHOLD}, {remaining_tasks} tasks left) - hibernating")
+        # Determine scheduling decision
+        if survival_prob < BOT_HIBERNATION_THRESHOLD:
+            # Very low survival - hibernate state (but still on burstable VM)
+            print(f"💤 [BoT] Low survival ({survival_prob:.2f}) - hibernating state (burstable VM protected)")
             state_to_hibernate = {
                 "result": result,
                 "progress": "pre_completion",
@@ -761,31 +701,30 @@ def main():
             bot_log_scheduling_decision(workflow, task_id, uid, baseline, "HIBERNATE", credits, survival_prob, details)
             log_decision(workflow, task_id, uid, baseline, "HIBERNATE", details)
             
-        elif workflow_completion_prob < BOT_CHECKPOINT_THRESHOLD:
-            # Medium completion probability - checkpoint for safety
-            print(f"⌛ [BoT] Medium completion prob ({workflow_completion_prob:.2f}) - checkpointing ({vm_type.upper()} VM)")
+        elif survival_prob < BOT_CHECKPOINT_THRESHOLD:
+            # Medium-low survival - checkpoint and consider CPU bursting
+            print(f"⌛ [BoT] Medium survival ({survival_prob:.2f}) - checkpointing (burstable VM)")
             checkpoint_to_db(task_id, uid, result, "bot_checkpoint", workflow, baseline)
             did_checkpoint = True
             
-            # CPU burst only on burstable VMs with sufficient credits
-            if vm_type == "burstable" and can_burst and credits >= BOT_MIN_CREDITS_FOR_BURST:
+            if can_burst:
+                # Use CPU burst to speed up execution
                 bot_consume_credits(pod_name, TASK_EXEC_MINUTES)
                 details["cpu_burst_active"] = True
                 print(f"⚡ [BoT] Using CPU burst (credits: {credits:.1f} → {bot_get_cpu_credits(pod_name):.1f})")
             
-            decision = "CHECKPOINT_BURST" if details.get("cpu_burst_active") else "CHECKPOINT"
-            bot_log_scheduling_decision(workflow, task_id, uid, baseline, decision, credits, survival_prob, details)
+            bot_log_scheduling_decision(workflow, task_id, uid, baseline, "CHECKPOINT_BURST" if can_burst else "CHECKPOINT", credits, survival_prob, details)
+            log_decision(workflow, task_id, uid, baseline, "SCALE_UP", details)
             
         else:
-            # Good survival - proceed normally
-            # Opportunistic burst on burstable (30% chance)
-            if vm_type == "burstable" and can_burst and credits >= BOT_MIN_CREDITS_FOR_BURST and random.random() < 0.3:
-                bot_consume_credits(pod_name, TASK_EXEC_MINUTES * 0.5)
+            # Good survival - proceed normally on burstable VM
+            if can_burst and random.random() < 0.3:  # 30% chance to burst for speed
+                bot_consume_credits(pod_name, TASK_EXEC_MINUTES * 0.5)  # Half cost for opportunistic burst
                 details["cpu_burst_active"] = True
                 print(f"⚡ [BoT] Opportunistic CPU burst (credits: {credits:.1f})")
             
             bot_log_scheduling_decision(workflow, task_id, uid, baseline, "NORMAL", credits, survival_prob, details)
-            print(f"✅ [BoT] Normal execution on {vm_type.upper()} VM - survival={survival_prob:.2f}")
+            print(f"✅ [BoT] Normal execution on burstable VM - survival={survival_prob:.2f}, credits={credits:.1f}")
 
     # OFP-TM baseline
     elif ofp_tm_enabled:

@@ -51,7 +51,7 @@ data:
   WORKFLOW_ID: "wf-1"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "2.3095"
+  TASK_EXEC_TIME: "3.5686"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -90,7 +90,7 @@ data:
   WORKFLOW_ID: "wf-1"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "4.5448"
+  TASK_EXEC_TIME: "5.7383"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -127,9 +127,9 @@ metadata:
 data:
   TASK_ID: "task3"
   WORKFLOW_ID: "wf-1"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3a,http://router.fission.svc.cluster.local/fission-function/task3b"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "1.7184"
+  TASK_EXEC_TIME: "12.5371"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -152,23 +152,23 @@ fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executort
 sleep 3
 wait_rollout_for_task "task3"
 
-echo "Applying ConfigMap wf-1-task4-mscheduler-cfg..."
+echo "Applying ConfigMap wf-1-task3a-mscheduler-cfg..."
 kubectl -n $NS apply -f - <<CMEOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wf-1-task4-mscheduler-cfg
+  name: wf-1-task3a-mscheduler-cfg
   labels:
     app: serverless-wf
     wf-id: wf-1
-    task-id: task4
+    task-id: task3a
     baseline: mscheduler
 data:
-  TASK_ID: "task4"
+  TASK_ID: "task3a"
   WORKFLOW_ID: "wf-1"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/taskr1"
   BASELINE: "mscheduler"
-  TASK_EXEC_TIME: "4.4263"
+  TASK_EXEC_TIME: "3.6273"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
@@ -185,11 +185,128 @@ data:
   MSCHED_PRICE_SPOT: "0.90"
 CMEOF
 
-echo "Creating function task4 (min=1, max=11) for baseline mscheduler..."
-fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-1-task4-mscheduler-cfg -n $NS
+echo "Creating function task3a (min=1, max=11) for baseline mscheduler..."
+fission fn delete --name task3a -n $NS >/dev/null 2>&1 || true
+fission fn create --name task3a --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-1-task3a-mscheduler-cfg -n $NS
 sleep 3
-wait_rollout_for_task "task4"
+wait_rollout_for_task "task3a"
+
+echo "Applying ConfigMap wf-1-task3b-mscheduler-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-task3b-mscheduler-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: task3b
+    baseline: mscheduler
+data:
+  TASK_ID: "task3b"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/taskr2"
+  BASELINE: "mscheduler"
+  TASK_EXEC_TIME: "4.8813"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  MSCHEDULER_ENABLED: "true"
+  MSCHEDULER_ENABLED: "true"
+  MSCHED_MAKESPAN_S: "900"
+  MSCHED_INTERVAL_S: "1800"
+  MSCHED_DUMP_S: "36.0"
+  MSCHED_OVERHEAD_SR: "1.0"
+  MSCHED_RESTORE_S: "36.0"
+  MSCHED_MIN_CKPTS: "1"
+  MSCHED_MIN_SPOT_SAVINGS: "0.65"
+  MSCHED_PRICE_OD: "3.00"
+  MSCHED_PRICE_SPOT: "0.90"
+CMEOF
+
+echo "Creating function task3b (min=1, max=11) for baseline mscheduler..."
+fission fn delete --name task3b -n $NS >/dev/null 2>&1 || true
+fission fn create --name task3b --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-1-task3b-mscheduler-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task3b"
+
+echo "Applying ConfigMap wf-1-taskr1-mscheduler-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-taskr1-mscheduler-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: taskr1
+    baseline: mscheduler
+data:
+  TASK_ID: "taskr1"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: ""
+  BASELINE: "mscheduler"
+  TASK_EXEC_TIME: "3.8942"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  MSCHEDULER_ENABLED: "true"
+  MSCHEDULER_ENABLED: "true"
+  MSCHED_MAKESPAN_S: "900"
+  MSCHED_INTERVAL_S: "1800"
+  MSCHED_DUMP_S: "36.0"
+  MSCHED_OVERHEAD_SR: "1.0"
+  MSCHED_RESTORE_S: "36.0"
+  MSCHED_MIN_CKPTS: "1"
+  MSCHED_MIN_SPOT_SAVINGS: "0.65"
+  MSCHED_PRICE_OD: "3.00"
+  MSCHED_PRICE_SPOT: "0.90"
+CMEOF
+
+echo "Creating function taskr1 (min=1, max=11) for baseline mscheduler..."
+fission fn delete --name taskr1 -n $NS >/dev/null 2>&1 || true
+fission fn create --name taskr1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-1-taskr1-mscheduler-cfg -n $NS
+sleep 3
+wait_rollout_for_task "taskr1"
+
+echo "Applying ConfigMap wf-1-taskr2-mscheduler-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-1-taskr2-mscheduler-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-1
+    task-id: taskr2
+    baseline: mscheduler
+data:
+  TASK_ID: "taskr2"
+  WORKFLOW_ID: "wf-1"
+  NEXT_TASK_URL: ""
+  BASELINE: "mscheduler"
+  TASK_EXEC_TIME: "2.1966"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  MSCHEDULER_ENABLED: "true"
+  MSCHEDULER_ENABLED: "true"
+  MSCHED_MAKESPAN_S: "900"
+  MSCHED_INTERVAL_S: "1800"
+  MSCHED_DUMP_S: "36.0"
+  MSCHED_OVERHEAD_SR: "1.0"
+  MSCHED_RESTORE_S: "36.0"
+  MSCHED_MIN_CKPTS: "1"
+  MSCHED_MIN_SPOT_SAVINGS: "0.65"
+  MSCHED_PRICE_OD: "3.00"
+  MSCHED_PRICE_SPOT: "0.90"
+CMEOF
+
+echo "Creating function taskr2 (min=1, max=11) for baseline mscheduler..."
+fission fn delete --name taskr2 -n $NS >/dev/null 2>&1 || true
+fission fn create --name taskr2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-1-taskr2-mscheduler-cfg -n $NS
+sleep 3
+wait_rollout_for_task "taskr2"
 
 echo "Recreating route wf-1-route ..."
 fission route delete --name=wf-1-route -n $NS >/dev/null 2>&1 || true

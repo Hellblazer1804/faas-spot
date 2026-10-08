@@ -67,9 +67,8 @@ FaaSpot addresses this by analyzing the workflow DAG **once at submission time**
 | `adaptive-scaler/` | §4.3 Adaptive Scaler | KM survival model + state-based scale-out · [docs](docs/scaler-optimizations.md) |
 | `retry-manager/` | §4.4 Retry Manager | Lineage-based retry with adaptive batch sizing · [docs](docs/retry-manager.md) |
 | `spot-emulator/` | §5.2 Spot Emulator | Trace-driven spot preemption emulator |
-| `workflow-functions/` | §6.1 Workflow Suite | Fission-deployed functions for all 8 DAG workflows |
 | `load-generator/` | — | Workload generators for each workflow type |
-| `test-runner/` | §5.1 | Experiment orchestrator (deploys, runs, monitors) |
+| `test-runner/` | §5.1 | Experiment orchestrator, deploy scripts, and custom workflow creator |
 | `experiments/` | §6 Evaluation | Baseline evaluation — Snape, Hourglass, MScheduler, Burst-HADS |
 | `docs/` | — | All documentation |
 
@@ -93,18 +92,18 @@ git clone https://github.com/YOUR_USERNAME/faas-spot.git
 cd faas-spot
 
 # 2. Install dependencies
-pip install -r retry-manager/requirements.txt
+pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
 # Edit .env: fill in DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, ROUTER_BASE_URL
 
 # 4. Run offline DAG analysis
-python3 task-ranker/heft_rank_identifier.py --workflow wf-5
-python3 checkpoint-planner/checkpointer.py --workflow wf-5
+python3 task-ranker/heft_rank_identifier.py --workflow wf-4
+python3 checkpoint-planner/checkpointer.py --workflow wf-4
 
 # 5. Run experiments
-python3 test-runner/test_runner.py --workflows wf-5
+python3 test-runner/test_runner.py --workflows wf-4
 ```
 
 ---
@@ -113,8 +112,10 @@ python3 test-runner/test_runner.py --workflows wf-5
 
 Copy `.env.example` to `.env` and fill in your values — **never commit `.env`**.
 
+### Infrastructure
+
 | Variable | Description |
-|----------|-------------|
+| --- | --- |
 | `DB_HOST` | MySQL host (default: `localhost`) |
 | `DB_USER` | MySQL username |
 | `DB_PASSWORD` | MySQL password |
@@ -124,6 +125,22 @@ Copy `.env.example` to `.env` and fill in your values — **never commit `.env`*
 | `DISCORD_WEBHOOK_URL` | Discord webhook for notifications (optional) |
 | `EXPERIMENT_TAG` | Tag applied to all DB rows from this run |
 
+### Workflow Behavior
+
+All components read these; set once in `.env`, applies everywhere.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `WF_TARGET_SUCCESS_RATE` | `0.85` | Fraction of requests that must succeed (0–1). Lower = accept more failures before intervening. |
+| `WF_MAX_RETRIES` | `20` | Max retry attempts per UID before giving up. |
+| `WF_MIN_BACKOFF_SEC` | `10` | Retry backoff floor (seconds). |
+| `WF_MAX_BACKOFF_SEC` | `240` | Retry backoff ceiling (seconds). |
+| `WF_BACKOFF_MULTIPLIER` | `1.3` | Exponential backoff growth rate. |
+| `WF_BUDGET_PERCENT` | `0.50` | Scaler budget as a fraction of estimated on-demand cost. |
+| `WF_ESTIMATED_RUNTIME_HOURS` | `1.5` | Expected experiment duration — used to compute the budget ceiling. |
+| `WF_ESTIMATED_MACHINES` | `8` | Expected machine count — used to compute the budget ceiling. |
+| `WF_COLD_START_MINUTES` | `5` | Minutes the scaler stays idle at startup to let the retry service handle early failures first. |
+
 ---
 
 ## Workflow Suite
@@ -131,7 +148,7 @@ Copy `.env.example` to `.env` and fill in your values — **never commit `.env`*
 Eight DAG workflows from four application domains (§6.1 of the paper):
 
 | ID | Name | Domain | Structure |
-|----|------|--------|-----------|
+| --- | --- | --- | --- |
 | wf-1 | Chain | Synthetic | Simple sequential chain |
 | wf-2 | Fork-Join | Synthetic | Single fan-out / fan-in |
 | wf-3 | 1000Genome | Genomics | Large fan-out / fan-in stages |
@@ -141,7 +158,72 @@ Eight DAG workflows from four application domains (§6.1 of the paper):
 | wf-7 | CyberShake | Seismology | Wide DAG with repeated fan-out/fan-in |
 | wf-8 | Montage | Astronomy | Three sub-pipelines with deep barriers |
 
-Workflow functions: `workflow-functions/`. DAG definitions: `test-runner/workflows/`.
+DAG definitions and deploy scripts live in `test-runner/workflows/`.
+
+---
+
+## Custom Workflows
+
+You can run FaaSpot against any DAG workflow you define — not just the 8 built-in ones.
+
+### 1. Define your workflow
+
+Create a `tasks.json` describing the DAG:
+
+```json
+{
+  "tasks": {
+    "task1": { "exec_time": 2.5, "successors": ["task2", "task3"], "minscale": 1 },
+    "task2": { "exec_time": 4.0, "successors": ["task4"],          "minscale": 2 },
+    "task3": { "exec_time": 3.0, "successors": ["task4"],          "minscale": 2 },
+    "task4": { "exec_time": 1.5, "successors": [],                 "minscale": 1 }
+  }
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `exec_time` | Simulated task duration in seconds (float) |
+| `successors` | Task IDs this task forwards to — empty list for leaf tasks |
+| `minscale` | Minimum Fission replica count; controls parallelism |
+
+### 2. Scaffold and deploy
+
+```bash
+python3 test-runner/create_workflow.py \
+  --name  my-wf \
+  --tasks path/to/tasks.json \
+  --run-ranker \
+  --run-checkpointer
+```
+
+This validates the DAG, generates all deploy scripts, and runs the offline HEFT analysis and checkpoint planning. Then deploy to Fission:
+
+```bash
+bash test-runner/workflows/my-wf/deploy_ours.sh
+```
+
+### 3. Run the experiment
+
+```bash
+python3 test-runner/test_runner.py --workflows my-wf
+```
+
+All three fault-tolerance mechanisms (checkpointing, adaptive scaling, lineage-based retry) apply to your custom workflow exactly as they do to the built-in ones.
+
+**Full CLI reference:**
+
+```text
+python3 test-runner/create_workflow.py
+  --name               my-wf           # Workflow ID (used as directory name and Fission route)
+  --tasks              tasks.json      # Path to your tasks.json
+  --baseline           ours            # Baseline label (default: ours)
+  --az                 us-west-2a      # Availability zone for spot trace lookup
+  --instance           v100            # Instance type for spot trace lookup
+  --budget             300             # Spot budget in dollars passed to the ranker
+  --run-ranker                         # Run HEFT Task Ranker (writes metadata.json)
+  --run-checkpointer                   # Run Checkpoint Planner (writes plan to MySQL)
+```
 
 ---
 
@@ -169,7 +251,7 @@ The `spot-emulator` uses two public datasets:
 - **SkyPilot** availability traces — spot instance lifetimes across AWS regions and instance types
 - **SpotLake** — historical spot pricing
 
-Derived trace files are in `spot-emulator/tracing/`.
+Trace CSV files must be placed in `spot-emulator/tracing/spot-traces-csv/` and `spot-emulator/tracing/spot-cost-csv/` before running experiments.
 
 ---
 

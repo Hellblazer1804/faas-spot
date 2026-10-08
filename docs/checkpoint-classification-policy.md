@@ -40,7 +40,7 @@ No transitions, all minscale = 1:
 
 ---
 
-### wf-3 — Sandwich (1 → 3 → 3 → 3 → 1)
+### wf-2 — Sandwich (1 → 3 → 3 → 3 → 1)
 
 ```
 task1(ms=1) → task2(ms=3) → task3(ms=3) → task4(ms=3) → task5(ms=1)
@@ -56,7 +56,7 @@ task1(ms=1) → task2(ms=3) → task3(ms=3) → task4(ms=3) → task5(ms=1)
 
 ---
 
-### wf-7 — Decreasing (6 → 6 → 2 → 1)
+### wf-6 — Decreasing (6 → 6 → 2 → 1)
 
 ```
 task1(ms=6) → task2(ms=6) → task3(ms=2) → task4(ms=1)
@@ -71,7 +71,7 @@ task1(ms=6) → task2(ms=6) → task3(ms=2) → task4(ms=1)
 
 ---
 
-### wf-5 — Long workflow with middle plateau (2 → 6 → 6 → 6 → 6 → 2 → 1 → 1 → 1)
+### wf-4 — Long workflow with middle plateau (2 → 6 → 6 → 6 → 6 → 2 → 1 → 1 → 1)
 
 ```
 task1(ms=2) → task2(ms=6) → task3(ms=6) → task4(ms=6) → task5(ms=6) → task6(ms=2) → task7(ms=1) → task8(ms=1) → task9(ms=1)
@@ -176,7 +176,7 @@ python3 verify_checkpoint_plan.py \
 ### Batch all workflows
 
 ```bash
-for wf in wf-1 wf-2 wf-3 wf-4 wf-5 wf-6 wf-7 wf-8 wf-9; do
+for wf in wf-1 wf-1 wf-2 wf-3 wf-4 wf-5 wf-6 wf-7 wf-8; do
   python3 Checkpoint-Planner/checkpointer.py \
     --workflows-dir Algorithm-Tester/workflows \
     --workflow $wf --baseline ours --write-plan-to-db

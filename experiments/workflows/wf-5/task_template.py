@@ -681,7 +681,7 @@ def main():
         # KEY FIX: Use survival_prob (which includes pod age) not task_duration_survival
         # The CDF has minimum lifetime of ~10 min, so short tasks always return 1.0
         # But pod age accumulates, so survival_prob decreases over time
-        total_tasks = int(read_cfg("TOTAL_WORKFLOW_TASKS", "9"))  # Default 9 tasks
+        total_tasks = int(read_cfg("TOTAL_WORKFLOW_TASKS", "6"))  # Default 6 tasks
         try:
             current_task_num = int(task_id.replace("task", "")) if task_id else 1
         except:

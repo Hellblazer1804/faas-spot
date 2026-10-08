@@ -70,8 +70,8 @@ class CSVSuccessRateEvaluator:
         task_ids = set(tasks_data.keys())
         
         # Check if all required start tasks are completed
-        if workflow_name == "wf-2":
-            # wf-2 is a branching workflow
+        if workflow_name == "wf-1":
+            # wf-1 is a branching workflow
             required_start = {"task1", "task2", "task3"}
             if not required_start.issubset(completed_tasks):
                 return False
@@ -84,8 +84,8 @@ class CSVSuccessRateEvaluator:
                 return True
             return False
         
-        elif workflow_name == "wf-6":
-            # wf-6 is a linear workflow that requires all tasks
+        elif workflow_name == "wf-5":
+            # wf-5 is a linear workflow that requires all tasks
             return completed_tasks == task_ids
         
         else:

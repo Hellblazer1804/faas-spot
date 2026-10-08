@@ -51,15 +51,15 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "static_cp"
-  TASK_EXEC_TIME: "1.6725"
+  TASK_EXEC_TIME: "9.6705"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task1 (min=8, max=81) for baseline static_cp..."
+echo "Creating function task1 (min=9, max=91) for baseline static_cp..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task1-static-cp-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 9 --maxscale 91 --fntimeout 120 --method POST --configmap wf-8-task1-static-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -79,15 +79,15 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "static_cp"
-  TASK_EXEC_TIME: "12.2845"
+  TASK_EXEC_TIME: "9.7233"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task2 (min=16, max=161) for baseline static_cp..."
+echo "Creating function task2 (min=12, max=121) for baseline static_cp..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 16 --maxscale 161 --fntimeout 120 --method POST --configmap wf-8-task2-static-cp-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 12 --maxscale 121 --fntimeout 120 --method POST --configmap wf-8-task2-static-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -107,15 +107,15 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "static_cp"
-  TASK_EXEC_TIME: "13.4584"
+  TASK_EXEC_TIME: "6.474"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task3 (min=8, max=81) for baseline static_cp..."
+echo "Creating function task3 (min=3, max=31) for baseline static_cp..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task3-static-cp-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task3-static-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -135,15 +135,15 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "static_cp"
-  TASK_EXEC_TIME: "15.7664"
+  TASK_EXEC_TIME: "19.8471"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task4 (min=8, max=81) for baseline static_cp..."
+echo "Creating function task4 (min=3, max=31) for baseline static_cp..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task4-static-cp-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task4-static-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
 
@@ -161,19 +161,131 @@ metadata:
 data:
   TASK_ID: "task5"
   WORKFLOW_ID: "wf-8"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task6"
   BASELINE: "static_cp"
-  TASK_EXEC_TIME: "7.7818"
+  TASK_EXEC_TIME: "9.453"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
 CMEOF
 
-echo "Creating function task5 (min=2, max=21) for baseline static_cp..."
+echo "Creating function task5 (min=9, max=91) for baseline static_cp..."
 fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-8-task5-static-cp-cfg -n $NS
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 9 --maxscale 91 --fntimeout 120 --method POST --configmap wf-8-task5-static-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task5"
+
+echo "Applying ConfigMap wf-8-task6-static-cp-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task6-static-cp-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task6
+    baseline: static_cp
+data:
+  TASK_ID: "task6"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task7"
+  BASELINE: "static_cp"
+  TASK_EXEC_TIME: "14.0344"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function task6 (min=3, max=31) for baseline static_cp..."
+fission fn delete --name task6 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task6 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task6-static-cp-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task6"
+
+echo "Applying ConfigMap wf-8-task7-static-cp-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task7-static-cp-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task7
+    baseline: static_cp
+data:
+  TASK_ID: "task7"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task8"
+  BASELINE: "static_cp"
+  TASK_EXEC_TIME: "2.8258"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function task7 (min=3, max=31) for baseline static_cp..."
+fission fn delete --name task7 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task7 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task7-static-cp-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task7"
+
+echo "Applying ConfigMap wf-8-task8-static-cp-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task8-static-cp-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task8
+    baseline: static_cp
+data:
+  TASK_ID: "task8"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task9"
+  BASELINE: "static_cp"
+  TASK_EXEC_TIME: "5.066"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function task8 (min=3, max=31) for baseline static_cp..."
+fission fn delete --name task8 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task8 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task8-static-cp-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task8"
+
+echo "Applying ConfigMap wf-8-task9-static-cp-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task9-static-cp-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task9
+    baseline: static_cp
+data:
+  TASK_ID: "task9"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: ""
+  BASELINE: "static_cp"
+  TASK_EXEC_TIME: "4.7579"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+CMEOF
+
+echo "Creating function task9 (min=1, max=11) for baseline static_cp..."
+fission fn delete --name task9 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task9 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-8-task9-static-cp-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task9"
 
 echo "Recreating route wf-8-route ..."
 fission route delete --name=wf-8-route -n $NS >/dev/null 2>&1 || true

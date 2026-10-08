@@ -51,12 +51,12 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "hourglass"
-  TASK_EXEC_TIME: "4.7707"
+  TASK_EXEC_TIME: "5.2526"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_EXEC_TIME: "14.0"
-  CRITICAL_PATH_TIME: "14.0"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
   CKPT_STRATEGY: "hourglass"
   HOURGLASS_DEADLINE_FACTOR: "1.5"
   HOURGLASS_SAFE_SLACK: "0.3"
@@ -64,9 +64,9 @@ data:
   HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
 CMEOF
 
-echo "Creating function task1 (min=8, max=81) for baseline hourglass..."
+echo "Creating function task1 (min=9, max=91) for baseline hourglass..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task1-hourglass-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 9 --maxscale 91 --fntimeout 120 --method POST --configmap wf-8-task1-hourglass-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -86,12 +86,12 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "hourglass"
-  TASK_EXEC_TIME: "5.7526"
+  TASK_EXEC_TIME: "7.4287"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_EXEC_TIME: "14.0"
-  CRITICAL_PATH_TIME: "14.0"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
   CKPT_STRATEGY: "hourglass"
   HOURGLASS_DEADLINE_FACTOR: "1.5"
   HOURGLASS_SAFE_SLACK: "0.3"
@@ -99,9 +99,9 @@ data:
   HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
 CMEOF
 
-echo "Creating function task2 (min=16, max=161) for baseline hourglass..."
+echo "Creating function task2 (min=12, max=121) for baseline hourglass..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 16 --maxscale 161 --fntimeout 120 --method POST --configmap wf-8-task2-hourglass-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 12 --maxscale 121 --fntimeout 120 --method POST --configmap wf-8-task2-hourglass-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -121,12 +121,12 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "hourglass"
-  TASK_EXEC_TIME: "9.3738"
+  TASK_EXEC_TIME: "9.0571"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_EXEC_TIME: "14.0"
-  CRITICAL_PATH_TIME: "14.0"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
   CKPT_STRATEGY: "hourglass"
   HOURGLASS_DEADLINE_FACTOR: "1.5"
   HOURGLASS_SAFE_SLACK: "0.3"
@@ -134,9 +134,9 @@ data:
   HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
 CMEOF
 
-echo "Creating function task3 (min=8, max=81) for baseline hourglass..."
+echo "Creating function task3 (min=3, max=31) for baseline hourglass..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task3-hourglass-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task3-hourglass-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -156,12 +156,12 @@ data:
   WORKFLOW_ID: "wf-8"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "hourglass"
-  TASK_EXEC_TIME: "9.7556"
+  TASK_EXEC_TIME: "10.1626"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_EXEC_TIME: "14.0"
-  CRITICAL_PATH_TIME: "14.0"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
   CKPT_STRATEGY: "hourglass"
   HOURGLASS_DEADLINE_FACTOR: "1.5"
   HOURGLASS_SAFE_SLACK: "0.3"
@@ -169,9 +169,9 @@ data:
   HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
 CMEOF
 
-echo "Creating function task4 (min=8, max=81) for baseline hourglass..."
+echo "Creating function task4 (min=3, max=31) for baseline hourglass..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-8-task4-hourglass-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task4-hourglass-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
 
@@ -189,14 +189,14 @@ metadata:
 data:
   TASK_ID: "task5"
   WORKFLOW_ID: "wf-8"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task6"
   BASELINE: "hourglass"
-  TASK_EXEC_TIME: "4.9035"
+  TASK_EXEC_TIME: "5.0994"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_EXEC_TIME: "14.0"
-  CRITICAL_PATH_TIME: "14.0"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
   CKPT_STRATEGY: "hourglass"
   HOURGLASS_DEADLINE_FACTOR: "1.5"
   HOURGLASS_SAFE_SLACK: "0.3"
@@ -204,11 +204,151 @@ data:
   HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
 CMEOF
 
-echo "Creating function task5 (min=2, max=21) for baseline hourglass..."
+echo "Creating function task5 (min=9, max=91) for baseline hourglass..."
 fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-8-task5-hourglass-cfg -n $NS
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 9 --maxscale 91 --fntimeout 120 --method POST --configmap wf-8-task5-hourglass-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task5"
+
+echo "Applying ConfigMap wf-8-task6-hourglass-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task6-hourglass-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task6
+    baseline: hourglass
+data:
+  TASK_ID: "task6"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task7"
+  BASELINE: "hourglass"
+  TASK_EXEC_TIME: "20.9812"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
+  CKPT_STRATEGY: "hourglass"
+  HOURGLASS_DEADLINE_FACTOR: "1.5"
+  HOURGLASS_SAFE_SLACK: "0.3"
+  HOURGLASS_RISKY_SLACK: "0.1"
+  HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
+CMEOF
+
+echo "Creating function task6 (min=3, max=31) for baseline hourglass..."
+fission fn delete --name task6 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task6 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task6-hourglass-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task6"
+
+echo "Applying ConfigMap wf-8-task7-hourglass-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task7-hourglass-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task7
+    baseline: hourglass
+data:
+  TASK_ID: "task7"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task8"
+  BASELINE: "hourglass"
+  TASK_EXEC_TIME: "6.3232"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
+  CKPT_STRATEGY: "hourglass"
+  HOURGLASS_DEADLINE_FACTOR: "1.5"
+  HOURGLASS_SAFE_SLACK: "0.3"
+  HOURGLASS_RISKY_SLACK: "0.1"
+  HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
+CMEOF
+
+echo "Creating function task7 (min=3, max=31) for baseline hourglass..."
+fission fn delete --name task7 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task7 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task7-hourglass-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task7"
+
+echo "Applying ConfigMap wf-8-task8-hourglass-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task8-hourglass-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task8
+    baseline: hourglass
+data:
+  TASK_ID: "task8"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task9"
+  BASELINE: "hourglass"
+  TASK_EXEC_TIME: "6.0322"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
+  CKPT_STRATEGY: "hourglass"
+  HOURGLASS_DEADLINE_FACTOR: "1.5"
+  HOURGLASS_SAFE_SLACK: "0.3"
+  HOURGLASS_RISKY_SLACK: "0.1"
+  HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
+CMEOF
+
+echo "Creating function task8 (min=3, max=31) for baseline hourglass..."
+fission fn delete --name task8 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task8 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-8-task8-hourglass-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task8"
+
+echo "Applying ConfigMap wf-8-task9-hourglass-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-8-task9-hourglass-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-8
+    task-id: task9
+    baseline: hourglass
+data:
+  TASK_ID: "task9"
+  WORKFLOW_ID: "wf-8"
+  NEXT_TASK_URL: ""
+  BASELINE: "hourglass"
+  TASK_EXEC_TIME: "3.4211"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  TOTAL_WORKFLOW_EXEC_TIME: "33.0"
+  CRITICAL_PATH_TIME: "33.0"
+  CKPT_STRATEGY: "hourglass"
+  HOURGLASS_DEADLINE_FACTOR: "1.5"
+  HOURGLASS_SAFE_SLACK: "0.3"
+  HOURGLASS_RISKY_SLACK: "0.1"
+  HOURGLASS_CONFIG: "SPOT_AGGRESSIVE"
+CMEOF
+
+echo "Creating function task9 (min=1, max=11) for baseline hourglass..."
+fission fn delete --name task9 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task9 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-8-task9-hourglass-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task9"
 
 echo "Recreating route wf-8-route ..."
 fission route delete --name=wf-8-route -n $NS >/dev/null 2>&1 || true

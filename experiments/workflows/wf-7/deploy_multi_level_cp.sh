@@ -51,16 +51,16 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "multi_level_cp"
-  TASK_EXEC_TIME: "7.8605"
+  TASK_EXEC_TIME: "2.2442"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
   MULTI_LEVEL_CKPT: "true"
 CMEOF
 
-echo "Creating function task1 (min=6, max=61) for baseline multi_level_cp..."
+echo "Creating function task1 (min=8, max=81) for baseline multi_level_cp..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-7-task1-multi-level-cp-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task1-multi-level-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -80,16 +80,16 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "multi_level_cp"
-  TASK_EXEC_TIME: "7.6617"
+  TASK_EXEC_TIME: "12.9449"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
   MULTI_LEVEL_CKPT: "true"
 CMEOF
 
-echo "Creating function task2 (min=6, max=61) for baseline multi_level_cp..."
+echo "Creating function task2 (min=16, max=161) for baseline multi_level_cp..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 6 --maxscale 61 --fntimeout 120 --method POST --configmap wf-7-task2-multi-level-cp-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 16 --maxscale 161 --fntimeout 120 --method POST --configmap wf-7-task2-multi-level-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -109,16 +109,16 @@ data:
   WORKFLOW_ID: "wf-7"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "multi_level_cp"
-  TASK_EXEC_TIME: "19.5779"
+  TASK_EXEC_TIME: "11.542"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
   MULTI_LEVEL_CKPT: "true"
 CMEOF
 
-echo "Creating function task3 (min=2, max=21) for baseline multi_level_cp..."
+echo "Creating function task3 (min=8, max=81) for baseline multi_level_cp..."
 fission fn delete --name task3 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-7-task3-multi-level-cp-cfg -n $NS
+fission fn create --name task3 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task3-multi-level-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task3"
 
@@ -136,20 +136,49 @@ metadata:
 data:
   TASK_ID: "task4"
   WORKFLOW_ID: "wf-7"
-  NEXT_TASK_URL: ""
+  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
   BASELINE: "multi_level_cp"
-  TASK_EXEC_TIME: "2.7262"
+  TASK_EXEC_TIME: "10.0635"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
   MULTI_LEVEL_CKPT: "true"
 CMEOF
 
-echo "Creating function task4 (min=1, max=11) for baseline multi_level_cp..."
+echo "Creating function task4 (min=8, max=81) for baseline multi_level_cp..."
 fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-7-task4-multi-level-cp-cfg -n $NS
+fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 8 --maxscale 81 --fntimeout 120 --method POST --configmap wf-7-task4-multi-level-cp-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
+
+echo "Applying ConfigMap wf-7-task5-multi-level-cp-cfg..."
+kubectl -n $NS apply -f - <<CMEOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wf-7-task5-multi-level-cp-cfg
+  labels:
+    app: serverless-wf
+    wf-id: wf-7
+    task-id: task5
+    baseline: multi_level_cp
+data:
+  TASK_ID: "task5"
+  WORKFLOW_ID: "wf-7"
+  NEXT_TASK_URL: ""
+  BASELINE: "multi_level_cp"
+  TASK_EXEC_TIME: "2.0987"
+  SCALE_FACTOR: "1.25"
+  AZ: "us-west-2a"
+  INSTANCE_TYPE: "v100"
+  MULTI_LEVEL_CKPT: "true"
+CMEOF
+
+echo "Creating function task5 (min=2, max=21) for baseline multi_level_cp..."
+fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
+fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-7-task5-multi-level-cp-cfg -n $NS
+sleep 3
+wait_rollout_for_task "task5"
 
 echo "Recreating route wf-7-route ..."
 fission route delete --name=wf-7-route -n $NS >/dev/null 2>&1 || true

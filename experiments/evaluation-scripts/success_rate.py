@@ -87,7 +87,7 @@ def is_valid_execution_path(uid, workflow_name, task_ids, tasks_data, cursor, ba
     cursor.execute(sql_query, tuple(params))
     completed_tasks = {row[0] for row in cursor.fetchall()}
     
-    if workflow_name == "wf-2":
+    if workflow_name == "wf-1":
         required_start = {"task1", "task2", "task3"}
         if not required_start.issubset(completed_tasks):
             return False

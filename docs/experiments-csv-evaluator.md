@@ -5,7 +5,7 @@ A powerful script for analyzing workflow execution data from CSV files and calcu
 ## Features
 
 - 📊 **CSV Data Analysis**: Parse and analyze workflow execution data from CSV files
-- 🔄 **Path-Aware Evaluation**: Support for both linear and branching workflows (wf-2, wf-6)
+- 🔄 **Path-Aware Evaluation**: Support for both linear and branching workflows (wf-1, wf-5)
 - 📈 **Comprehensive Metrics**: Success rates, execution counts, task completion statistics
 - 🎯 **Flexible Filtering**: Analyze specific workflows, baselines, or all data
 - 📤 **Multiple Output Formats**: Console output, CSV export, detailed reports
@@ -22,7 +22,7 @@ wf-1,task2,1754945028.000,1754945043.000,a54b7703-e71a-45b2-ae16-d1c22a084ec9,20
 ```
 
 ### Required Columns:
-- `workflow_name`: Name of the workflow (e.g., wf-1, wf-2)
+- `workflow_name`: Name of the workflow (e.g., wf-1, wf-1)
 - `workflow_stage`: Task name within the workflow
 - `uuid_passed`: Unique identifier for each execution
 - `baseline`: Baseline configuration name
@@ -89,8 +89,8 @@ python3 evaluate_csv_success_rate.py --csv-file debugged-evals/resultset-evaluat
 🔹 Baseline: static
 --------------------------------------------------
 ✅ wf-1: 85.7% (6/7)
-🟡 wf-2: 75.0% (3/4)
-🟠 wf-3: 45.5% (5/11)
+🟡 wf-1: 75.0% (3/4)
+🟠 wf-2: 45.5% (5/11)
 ```
 
 ### Detailed Analysis
@@ -120,18 +120,18 @@ The exported CSV contains:
 
 ## Workflow Types Supported
 
-### Linear Workflows (wf-1, wf-3, wf-4, wf-5, wf-7, wf-8, wf-9)
+### Linear Workflows (wf-1, wf-2, wf-3, wf-4, wf-6, wf-7, wf-8)
 - **Success Criteria**: All tasks must complete
 - **Example**: wf-1 requires task1, task2, task3, task4
 
-### Branching Workflows (wf-2)
+### Branching Workflows (wf-1)
 - **Success Criteria**: Common start tasks + at least one valid path
 - **Valid Paths**: 
   - Path A: task3a + taskr1
   - Path B: task3b + taskr2
 - **Required Start**: task1, task2, task3
 
-### Special Workflows (wf-6)
+### Special Workflows (wf-5)
 - **Success Criteria**: All tasks must complete (corrected from circular dependency)
 
 ## Dependencies
@@ -150,10 +150,10 @@ python3 evaluate_csv_success_rate.py --csv-file experiment_results.csv
 
 ### Example 2: Specific Analysis
 ```bash
-# Analyze wf-2 with detailed breakdown
+# Analyze wf-1 with detailed breakdown
 python3 evaluate_csv_success_rate.py \
   --csv-file experiment_results.csv \
-  --workflow wf-2 \
+  --workflow wf-1 \
   --baseline snape \
   --detailed
 ```

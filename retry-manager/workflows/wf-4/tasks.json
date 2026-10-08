@@ -1,9 +1,14 @@
 {
     "tasks": {
-      "task1": { "exec_time": 2, "successors": ["task2"], "minscale": 3 },
-      "task2": { "exec_time": 4, "successors": ["task3"] , "minscale": 2},
-      "task3": { "exec_time": 3, "successors": ["task4"] , "minscale": 3},
-      "task4": { "exec_time": 3, "successors": [] , "minscale": 3}
+      "task1": { "exec_time": 2, "successors": ["task2"], "minscale": 2 },
+      "task2": { "exec_time": 6, "successors": ["task3"], "minscale": 6 },
+      "task3": { "exec_time": 6, "successors": ["task4"], "minscale": 6 },
+      "task4": { "exec_time": 6, "successors": ["task5"], "minscale": 6 },
+      "task5": { "exec_time": 6, "successors": ["task6"], "minscale": 6 },
+      "task6": { "exec_time": 2, "successors": ["task7"], "minscale": 2 },
+      "task7": { "exec_time": 1, "successors": ["task8"] , "minscale": 1},
+      "task8": { "exec_time": 1, "successors": ["task9"] , "minscale": 1},
+      "task9": { "exec_time": 1, "successors": [] , "minscale": 1}
     }
   }
   

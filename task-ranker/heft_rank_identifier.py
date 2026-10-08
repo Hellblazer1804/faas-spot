@@ -106,7 +106,7 @@ def assign_scaling_with_hybrid_strategy(tasks, ranks, spot_budget, unit_cost=1, 
 
 def main():
     parser = argparse.ArgumentParser(description="HEFT Ranker -> patch per-task ConfigMaps")
-    parser.add_argument("--workflow", required=True, help="Workflow ID (e.g., wf-3)")
+    parser.add_argument("--workflow", required=True, help="Workflow ID (e.g., wf-2)")
     parser.add_argument("--budget", type=int, default=300, help="Total spot budget for scaling calculations")
     parser.add_argument("--workflows-dir", required=True, help="Directory containing workflow definitions")
     parser.add_argument("--baseline", default="ours")

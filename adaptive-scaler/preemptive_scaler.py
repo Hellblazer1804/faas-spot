@@ -182,13 +182,12 @@ GLOBAL_SCALER_COOLDOWN_SECONDS = 120  # 2 minutes global cooldown after any scal
 MIN_RETRY_EXHAUSTED_UIDS = 12  # At least 12 UIDs must have exhausted retries
 
 # Retry-gate overrides (sensitivity/ablation support)
-RETRY_EXHAUST_DISABLE_WORKFLOWS = {'wf-5'}
-RETRY_EXHAUST_DISABLE_WORKFLOWS |= _parse_env_workflow_set(os.getenv("CHECKSCALE_RETRY_EXHAUST_DISABLE_WORKFLOWS"))
+RETRY_EXHAUST_DISABLE_WORKFLOWS = _parse_env_workflow_set(os.getenv('CHECKSCALE_RETRY_EXHAUST_DISABLE_WORKFLOWS', ''))
 RETRY_EXHAUST_DISABLE_ALL = _env_flag("CHECKSCALE_RETRY_EXHAUST_DISABLE_ALL")
 RETRY_EXHAUST_DISABLE_MIN_RUNS = _parse_env_int(os.getenv("CHECKSCALE_RETRY_EXHAUST_DISABLE_MIN_RUNS"), 20)
 
 # Adaptive bypass: allow scaling early for critical workflows when success lags
-RETRY_EXHAUST_BYPASS_WORKFLOWS = {'wf-5', 'wf-9'}
+RETRY_EXHAUST_BYPASS_WORKFLOWS = _parse_env_workflow_set(os.getenv('CHECKSCALE_RETRY_EXHAUST_BYPASS_WORKFLOWS', ''))
 RETRY_EXHAUST_BYPASS_FRAC = 0.85
 RETRY_EXHAUST_BYPASS_MIN_RUNS = 20
 
@@ -223,13 +222,11 @@ def check_retry_service_exhausted(workflow: str, baseline: str = None) -> tuple:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # Query: find UIDs where retry_count >= max retries (workflow-specific)
-        # Default max retries is 3, but some workflows have higher limits
         workflow_max_retries = {
-            'wf-1': 10, 'wf-2': 15, 'wf-3': 12, 'wf-4': 12,
-            'wf-5': 20, 'wf-6': 20, 'wf-7': 12, 'wf-8': 25, 'wf-9': 25
+            'wf-1': 15, 'wf-2': 18, 'wf-3': 15, 'wf-4': 25,
+            'wf-5': 25, 'wf-6': 15, 'wf-7': 30, 'wf-8': 35,
         }
-        max_retries = workflow_max_retries.get(workflow, 3)
+        max_retries = workflow_max_retries.get(workflow, 15)
         
         query = """
             SELECT COUNT(DISTINCT uid) as exhausted_count
@@ -347,62 +344,18 @@ def get_global_scaler_status() -> dict:
 # 4. Prioritizes tasks with best historical CPSP
 # 5. Retry service is the hero - scaler should be conservative
 
-# Budget as percentage of on-demand cost (calculated from spot traces)
-# Target: 50% of on-demand cost to win on cost (includes scaling, retry, churn)
-# Reference: Total on-demand cost for full experiment is ~$60, so budget cap is ~$30
-BUDGET_MIN_PERCENT = 0.40  # Minimum 40% of on-demand (strict cost control)
-BUDGET_MAX_PERCENT = 0.65  # Maximum 60% of on-demand (for complex workflows)
-BUDGET_DEFAULT_PERCENT = 0.50  # Default 50% of on-demand (strict cap per user requirement)
+# Budget and runtime config — tune via environment variables (see .env.example)
+WF_BUDGET_PERCENT            = float(os.getenv('WF_BUDGET_PERCENT', '0.50'))
+WF_ESTIMATED_RUNTIME_HOURS   = float(os.getenv('WF_ESTIMATED_RUNTIME_HOURS', '1.5'))
+WF_ESTIMATED_MACHINES        = int(os.getenv('WF_ESTIMATED_MACHINES', '8'))
 
-# Per-workflow budget overrides (complex workflows get more headroom)
-WORKFLOW_BUDGET_PERCENT = {
-    'wf-5': 0.65,  # 60% - complex deep DAG, needs more scaling headroom
-    'wf-9': 0.65,  # 60% - most complex workflow, deepest DAG
-    # All other workflows use BUDGET_DEFAULT_PERCENT (50%)
-}
-
-# Adaptive budget: boost only when success is lagging (avoid overscaling)
-ADAPTIVE_BUDGET_ENABLED = True
-ADAPTIVE_BUDGET_BOOST = 0.05  # +5% headroom when under target
-ADAPTIVE_BUDGET_TRIGGER_FRAC = 0.85  # Trigger when success < 85% of target
-ADAPTIVE_BUDGET_MIN_RUNS = 20  # Avoid boosting before enough samples
-ADAPTIVE_BUDGET_WORKFLOWS = {'wf-5', 'wf-9'}
-
-# Churn overhead: Previously used to account for pod respawning after emulator kills
-# Now set to 1.0 because 50% budget cap already includes all costs (scaling, retry, churn)
-CHURN_OVERHEAD_FACTOR = 1.0  # No additional overhead - 50% is the hard cap
-
-# Estimated total experiment runtime (in REAL hours) - used to calculate cost budgets
-# Costs are calculated using real time (pod_age_seconds), so budget must use real time too
-# UPDATED from run8.log: Load generator sends 500 requests at concurrency=4, taking much longer than expected
-WORKFLOW_ESTIMATED_RUNTIME_HOURS = {
-    # Based on actual observed experiment runtimes from run8.log
-    # Load generator: 500 requests, concurrency=4, interval=0.25s, up to 60s timeout per request
-    'wf-1': 1.00,    # Simple: observed 3539s = 59 min (was 0.25)
-    'wf-2': 1.75,    # Simple with branches: observed 6211s = 103 min (was 0.33)
-    'wf-3': 1.65,    # Medium: observed 5820s = 97 min (was 0.50)
-    'wf-4': 1.85,    # Medium: observed 6527s = 109 min (was 0.50)
-    'wf-5': 2.10,    # Complex: observed 7363s = 123 min (was 1.60)
-    'wf-6': 1.50,    # Complex: ~90 real minutes estimated
-    'wf-7': 1.00,    # Medium: ~60 real minutes estimated
-    'wf-8': 1.50,    # Complex: ~90 real minutes estimated
-    'wf-9': 2.00,    # Most complex: ~120 real minutes estimated
-}
-
-# Default estimated MACHINES per workflow (from total_minscale / 3)
-# Machine packing: 3 pods per machine, so cost = machines × price
-# These are calculated from tasks.json total minscale values
-WORKFLOW_ESTIMATED_MACHINES = {
-    'wf-1': 2,    # total_minscale=4, machines=ceil(4/3)=2
-    'wf-2': 3,    # total_minscale=7, machines=ceil(7/3)=3
-    'wf-3': 4,    # total_minscale=11, machines=ceil(11/3)=4
-    'wf-4': 4,    # total_minscale=11, machines=ceil(11/3)=4
-    'wf-5': 11,   # total_minscale=31, machines=ceil(31/3)=11
-    'wf-6': 12,   # total_minscale=36, machines=ceil(36/3)=12
-    'wf-7': 5,    # total_minscale=15, machines=ceil(15/3)=5
-    'wf-8': 14,   # total_minscale=42, machines=ceil(42/3)=14
-    'wf-9': 16,   # total_minscale=46, machines=ceil(46/3)=16
-}
+BUDGET_MIN_PERCENT    = 0.40
+BUDGET_MAX_PERCENT    = 0.65
+ADAPTIVE_BUDGET_ENABLED      = True
+ADAPTIVE_BUDGET_BOOST        = 0.05
+ADAPTIVE_BUDGET_TRIGGER_FRAC = 0.85
+ADAPTIVE_BUDGET_MIN_RUNS     = 20
+CHURN_OVERHEAD_FACTOR        = 1.0
 
 # Machine packing factor (same as Emulator.py)
 PODS_PER_MACHINE = 3
@@ -497,16 +450,16 @@ def get_workflow_budget(workflow_name: str, ondemand_price_per_hour: float = Non
         ondemand_price_per_hour = _ondemand_price_per_hour or 3.0  # Default fallback
     
     # Get workflow-specific estimates
-    runtime_hours = WORKFLOW_ESTIMATED_RUNTIME_HOURS.get(workflow_name, 0.15)
-    estimated_machines = WORKFLOW_ESTIMATED_MACHINES.get(workflow_name, 6)
+    runtime_hours = WF_ESTIMATED_RUNTIME_HOURS
+    estimated_machines = WF_ESTIMATED_MACHINES
     
     # Calculate on-demand cost estimate
     # OnDemandCost = Price/hr * Runtime(hrs) * Machines
     # Note: Price is per MACHINE (not per pod) since 3 pods share 1 machine
     ondemand_cost = ondemand_price_per_hour * runtime_hours * estimated_machines
     
-    # Get per-workflow budget percentage (wf-5, wf-9 get 60%, others get 50%)
-    budget_percent = WORKFLOW_BUDGET_PERCENT.get(workflow_name, BUDGET_DEFAULT_PERCENT)
+    # Get per-workflow budget percentage (wf-4, wf-8 get 60%, others get 50%)
+    budget_percent = WF_BUDGET_PERCENT
     override_percent = get_budget_override_percent(workflow_name)
     if override_percent is not None:
         budget_percent = override_percent
@@ -521,7 +474,7 @@ def compute_adaptive_budget_percent(workflow_name: str, base_percent: float,
     """Return adaptive budget percent based on success gap (to avoid overscaling)."""
     if not ADAPTIVE_BUDGET_ENABLED:
         return base_percent
-    if workflow_name not in ADAPTIVE_BUDGET_WORKFLOWS:
+    if False:
         return base_percent
     if success_rate is None or total_runs is None:
         return base_percent
@@ -537,7 +490,7 @@ def compute_adaptive_budget_percent(workflow_name: str, base_percent: float,
 def apply_adaptive_budget_envelope(workflow_name: str, success_rate: float, total_runs: int):
     """Adjust budget envelope mid-run if success lags."""
     global budget_envelope_tracker, _ondemand_price_per_hour
-    base_percent = WORKFLOW_BUDGET_PERCENT.get(workflow_name, BUDGET_DEFAULT_PERCENT)
+    base_percent = WF_BUDGET_PERCENT
     override_percent = get_budget_override_percent(workflow_name)
     if override_percent is not None:
         base_percent = override_percent
@@ -548,8 +501,8 @@ def apply_adaptive_budget_envelope(workflow_name: str, success_rate: float, tota
     estimated_ondemand_cost = budget_envelope_tracker.get('estimated_ondemand_cost')
     if estimated_ondemand_cost is None:
         ondemand_price = budget_envelope_tracker.get('ondemand_price_per_hour') or _ondemand_price_per_hour or 3.0
-        runtime_hours = WORKFLOW_ESTIMATED_RUNTIME_HOURS.get(workflow_name, 0.15)
-        estimated_machines = WORKFLOW_ESTIMATED_MACHINES.get(workflow_name, 6)
+        runtime_hours = WF_ESTIMATED_RUNTIME_HOURS
+        estimated_machines = WF_ESTIMATED_MACHINES
         estimated_ondemand_cost = ondemand_price * runtime_hours * estimated_machines
         budget_envelope_tracker['estimated_ondemand_cost'] = estimated_ondemand_cost
     budget_envelope_tracker['budget_percent'] = new_percent
@@ -597,8 +550,8 @@ def reset_budget_envelope(workflow_name, az: str = None, instance: str = None):
     budget, budget_percent = get_workflow_budget(workflow_name, ondemand_price)
     
     # Calculate estimated on-demand cost for logging (using machines, not pods)
-    runtime_hours = WORKFLOW_ESTIMATED_RUNTIME_HOURS.get(workflow_name, 0.15)
-    estimated_machines = WORKFLOW_ESTIMATED_MACHINES.get(workflow_name, 6)
+    runtime_hours = WF_ESTIMATED_RUNTIME_HOURS
+    estimated_machines = WF_ESTIMATED_MACHINES
     estimated_ondemand_cost = ondemand_price * runtime_hours * estimated_machines
     
     budget_envelope_tracker = {
@@ -1093,7 +1046,7 @@ def get_cost_win_throttle(success_rate, target_success, normalized_cost, window=
     marginal_gain = recent_gain < COST_WIN_MIN_GAIN
     
     # For complex workflows significantly below target, don't throttle - they need scaling
-    if workflow_name and workflow_name in COMPLEX_WORKFLOWS:
+    if workflow_name and True:
         if success_rate < target_success * 0.80:  # More than 20% below target
             return 1.0  # No throttling - let them scale
         elif success_rate < target_success * 0.95:  # 5-20% below target
@@ -1232,10 +1185,10 @@ def clamp_post_target_pods(all_function_specs, metadata, workflow_name, success_
     """
     Clamp pods close to base when success is already on target but cost remains elevated.
 
-    This is intentionally gentler than a full reset so wf-8/wf-9 keep some safety headroom
+    This is intentionally gentler than a full reset so wf-7/wf-8 keep some safety headroom
     while still cutting tail cost.
     """
-    if workflow_name not in POST_TARGET_CLAMP_WORKFLOWS:
+    if False:
         return 0
     if total_runs < POST_TARGET_CLAMP_MIN_RUNS:
         return 0
@@ -1273,20 +1226,20 @@ def clamp_post_target_pods(all_function_specs, metadata, workflow_name, success_
 MAX_SCALE_MULTIPLE_SIMPLE = 2   # Simple workflows: 2x base minscale (minimal scaling)
 MAX_SCALE_MULTIPLE_COMPLEX = 4  # Complex workflows: 4x base minscale (more headroom)
 MAX_TOTAL_PODS = 60             # Simple workflows: tight cap (base totals are 4-15 pods)
-MAX_TOTAL_PODS_COMPLEX = 150    # Complex workflows: higher cap (wf-5=31, wf-9=46 base pods)
+MAX_TOTAL_PODS_COMPLEX = 150    # Complex workflows: higher cap (wf-4=31, wf-8=46 base pods)
 CRITICAL_PATH_POD_BUDGET_BUFFER = 10  # Allow limited overage for critical-path recovery
 MIN_COST_BENEFIT_FLOOR = 0.01  # Minimum threshold: require 1% cost-benefit ratio for any scaling
 MIN_HARD_CAP_FLOOR = 6  # Minimum hard cap for any task
 
 def get_max_scale_multiple(workflow_name):
     """Get the maximum scale multiple for a workflow."""
-    if workflow_name in COMPLEX_WORKFLOWS:
+    if True:
         return MAX_SCALE_MULTIPLE_COMPLEX
     return MAX_SCALE_MULTIPLE_SIMPLE
 
 def get_max_total_pods(workflow_name):
     """Get the maximum total pods budget for a workflow."""
-    if workflow_name in COMPLEX_WORKFLOWS:
+    if True:
         return MAX_TOTAL_PODS_COMPLEX
     return MAX_TOTAL_PODS
 
@@ -1554,15 +1507,10 @@ COST_BASELINE_PER_POD_HOUR = 0.30  # $0.30/pod-hour (realistic spot pricing)
 # Time compression factor: Emulator uses 1 real second = 60 emulator seconds
 EMULATOR_TIME_COMPRESSION = 60
 
-# Workflow classification (moved up for early reference)
-COMPLEX_WORKFLOWS = {'wf-5', 'wf-6', 'wf-8', 'wf-9'}  # Target 65-70% success
-SIMPLE_WORKFLOWS = {'wf-1', 'wf-2', 'wf-3', 'wf-4', 'wf-7'}  # Target 95-100% success
 BUDGET_EMERGENCY_BYPASS_ENABLED = True
 BUDGET_EMERGENCY_BYPASS_THRESHOLD = 0.85  # Allow limited scaling if <85% of target
 BUDGET_EMERGENCY_THROTTLE = 0.40          # Throttle scaling when bypassing budget gate
 RL_HARD_IDLE_NORM_COST_THRESHOLD = 1.10  # If cost is high and success is at target, force idle in RL
-SKIP_SCALE_UP_MIN_RUNS = {'wf-5': 20}    # Delay "skip scale-up" until enough real runs
-POST_TARGET_CLAMP_WORKFLOWS = {'wf-8', 'wf-9'}  # High-cost complex workflows needing tail-cost clipping
 POST_TARGET_CLAMP_NORM_COST_THRESHOLD = 1.10
 POST_TARGET_CLAMP_SCALE_MULTIPLE = 1.20  # Keep small buffer above base, avoid full reset thrash
 POST_TARGET_CLAMP_MIN_RUNS = 10
@@ -1902,7 +1850,7 @@ def get_hard_scale_cap(task_id, base_minscale, workflow_name):
     Returns the maximum allowed minscale for this task.
     
     Uses MIN_HARD_CAP_FLOOR to ensure tasks with low base minscale (1-2) can still
-    scale adequately during emergencies - this was the root cause of wf-5/wf-9 failures
+    scale adequately during emergencies - this was the root cause of wf-4/wf-8 failures
     where bottleneck tasks like task9 (base=1) couldn't scale beyond 5 replicas.
     """
     # Hard cap: no task can scale more than MAX_SCALE_MULTIPLE times its base
@@ -1911,8 +1859,8 @@ def get_hard_scale_cap(task_id, base_minscale, workflow_name):
     base_cap = max(base_minscale * max_scale_multiple, MIN_HARD_CAP_FLOOR)
     
     # Additional caps based on workflow type - generous for complex workflows
-    if workflow_name in COMPLEX_WORKFLOWS:
-        # Complex workflows (wf-5,6,8,9): allow up to 10x base, max 80 pods per task
+    if True:
+        # Complex workflows (wf-4,6,8,9): allow up to 10x base, max 80 pods per task
         # These need aggressive scaling to handle bottlenecks
         return min(base_cap, 80)
     else:
@@ -1998,7 +1946,7 @@ def calculate_speculative_replicas(task_id, current_scale, task_drop_off, bottle
     
     # For complex/deep DAG workflows, be MUCH more conservative with speculation
     # These workflows need targeted scaling, not blanket speculation
-    is_complex = workflow_name in COMPLEX_WORKFLOWS
+    is_complex = True
     MAX_SPECULATIVE_REPLICAS = 2 if is_complex else 3  # Reduced cap for complex workflows
     
     # Trigger 1: High drop-off rate (task is failing frequently)
@@ -2185,14 +2133,14 @@ def get_workflow_success_rate(workflow_name, workflows_dir, baseline=None):
             return 0.0, 0, 0
         
         # For each UUID, check if workflow succeeded
-        # For branching workflows (like wf-2), success means completing EITHER branch, not all tasks
+        # For branching workflows (like wf-1), success means completing EITHER branch, not all tasks
         successful_uids = set()
         
         # Special handling for branching workflows
-        # wf-2: Path 1 = task1→task2→task3→task3a→taskr1, Path 2 = task1→task2→task3→task3b→taskr2
+        # wf-1: Path 1 = task1→task2→task3→task3a→taskr1, Path 2 = task1→task2→task3→task3b→taskr2
         # Success if common prefix (task1, task2, task3) + EITHER branch endpoint (taskr1 OR taskr2) completed
         branching_workflows = {
-            'wf-2': {
+            'wf-1': {
                 'common_prefix': {'task1', 'task2', 'task3'},
                 'branch_endpoints': ['taskr1', 'taskr2']  # Either endpoint completes = success
             }
@@ -2300,7 +2248,7 @@ def get_bottleneck_predecessors(metadata, workflows_dir=None, workflow_name=None
     """
     Identify tasks that FEED INTO bottlenecks (fan-in predecessors).
     
-    In a fan-in/fan-out DAG like wf-5:
+    In a fan-in/fan-out DAG like wf-4:
       task5(6) → task6(2) is a 3:1 bottleneck
       task5 is the "bottleneck predecessor" - it's producing 6 parallel outputs
       that need to converge into task6's 2 pods.
@@ -2535,7 +2483,7 @@ def get_critical_path_scaling_boost(task_id, critical_path_metrics, workflow_nam
     # Base boost for critical path tasks
     if is_on_critical_path:
         # Critical path tasks get significant boost
-        if workflow_name in COMPLEX_WORKFLOWS:
+        if True:
             return 2.0  # 2x boost for complex workflow critical path tasks
         else:
             return 1.5  # 1.5x boost for simple workflow critical path tasks
@@ -2827,7 +2775,7 @@ def get_effective_scaling_factor(task_id, metadata, bottleneck_ratios=None,
     # But we don't need aggressive scaling when already meeting targets
     target_for_bottleneck = get_target_success_rate(workflow_name)
     if bottleneck_ratio > 1.0 and (workflow_success_rate is None or workflow_success_rate < target_for_bottleneck):
-        if workflow_name in COMPLEX_WORKFLOWS:
+        if True:
             # Complex workflows: Aggressive bottleneck boost ONLY when below target
             # Scale boost by how far below target we are (0% at target, 100% at 0% success)
             success_gap_factor = 1.0 if workflow_success_rate is None else max(0.3, (target_for_bottleneck - workflow_success_rate) / target_for_bottleneck)
@@ -2843,13 +2791,13 @@ def get_effective_scaling_factor(task_id, metadata, bottleneck_ratios=None,
     
     # Apply short-lifetime risk boost (more aggressive scaling for pods with short lifetimes)
     # Guard: only apply lifetime risk boosts to complex workflows to avoid thrash on simple ones
-    if workflow_name in COMPLEX_WORKFLOWS and pod_lifetime_risk is not None and pod_lifetime_risk > 0.5:  # High risk (short lifetime)
+    if True and pod_lifetime_risk is not None and pod_lifetime_risk > 0.5:  # High risk (short lifetime)
         # Boost scaling by up to 1.5x for very short lifetimes
         lifetime_boost = 1.0 + (pod_lifetime_risk - 0.5) * 1.0  # 0.0-1.0 boost
         effective_factor *= (1.0 + lifetime_boost * 0.3)  # Up to 30% additional boost
         # Additional boost only for complex workflows (already gated)
         effective_factor *= (1.0 + lifetime_boost * 0.2)  # Additional 20% boost
-    elif (workflow_name in SIMPLE_WORKFLOWS and pod_lifetime_risk is not None and
+    elif (False and pod_lifetime_risk is not None and
           workflow_success_rate is not None):
         # Enhanced lifetime-risk assistance for simple workflows when they slip below high target
         target = get_target_success_rate(workflow_name)
@@ -2888,7 +2836,7 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
     
     Critical path tasks have zero slack and MUST be scaled aggressively for deadline compliance.
     
-    For wf-2, also includes high-failure-rate tasks (task3a, task3b) that are causing drop-offs.
+    For wf-1, also includes high-failure-rate tasks (task3a, task3b) that are causing drop-offs.
     
     Args:
         metadata: Task metadata dict with minscale and heft_rank
@@ -2941,7 +2889,7 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
         bottleneck_boost = (bottleneck_ratio - 1.0) * 10 if bottleneck_ratio > 1.0 else 0
         
         # CRITICAL: Boost for bottleneck predecessors (tasks feeding INTO bottlenecks)
-        # These tasks (like task5 in wf-5) often have high failure rates due to backpressure
+        # These tasks (like task5 in wf-4) often have high failure rates due to backpressure
         # They should get HIGHER priority than the bottleneck receivers
         if bottleneck_pred_ratio > 1.3:
             # Significant boost for tasks that feed into bottlenecks
@@ -2949,9 +2897,9 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
             bottleneck_pred_boost = (bottleneck_pred_ratio - 1.0) * 15
             bottleneck_boost = max(bottleneck_boost, bottleneck_pred_boost)
         
-        # Boost score for high failure rates (especially important for wf-2's task3a/task3b)
+        # Boost score for high failure rates (especially important for wf-1's task3a/task3b)
         # CRITICAL FIX: Lower threshold to 20% and use quadratic scaling for high failure rates
-        # task5 in wf-5 has ~37% drop-off and MUST be prioritized
+        # task5 in wf-4 has ~37% drop-off and MUST be prioritized
         if failure_rate > 0.30:  # >30% drop-off: major bottleneck
             failure_boost = failure_rate * 50.0  # 50x weight for severe failures
         elif failure_rate > 0.20:  # 20-30% drop-off: significant issue
@@ -2981,9 +2929,9 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
     # Return top N (tuple: task_id, score, heft_rank, bottleneck, bottleneck_pred, failure_rate, is_critical, cp_boost)
     result = [task_id for task_id, _, _, _, _, _, _, _ in criticality_scores[:top_n]]
     
-    # For wf-2, ensure task3a and task3b are included if they have high failure rates
+    # For wf-1, ensure task3a and task3b are included if they have high failure rates
     # These are critical parallel branches that both must complete
-    if workflow_name == 'wf-2' and task_failure_rates:
+    if workflow_name == 'wf-1' and task_failure_rates:
         high_failure_tasks = []
         for task_id in ['task3a', 'task3b']:
             if task_id in metadata and task_failure_rates.get(task_id, 0) > 0.40:
@@ -2997,8 +2945,8 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
                 print(f"   🚨 Added {task} to critical tasks due to high failure rate ({failure_pct:.1f}%)")
     
     # CRITICAL FIX: For ALL complex workflows, ensure high-failure tasks are included
-    # This is essential for wf-5 where task5 has ~37% drop-off but low HEFT rank
-    if workflow_name in COMPLEX_WORKFLOWS and task_failure_rates:
+    # This is essential for wf-4 where task5 has ~37% drop-off but low HEFT rank
+    if True and task_failure_rates:
         # Find all tasks with >25% failure rate that aren't already in result
         high_failure_tasks = [
             (task_id, fr) for task_id, fr in task_failure_rates.items()
@@ -3012,7 +2960,7 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
     
     # PROACTIVE: For ALL complex workflows, ensure bottleneck predecessor tasks are included
     # These tasks feed into bottlenecks and need proactive scaling before failure rates spike
-    if workflow_name in COMPLEX_WORKFLOWS and bottleneck_predecessors:
+    if True and bottleneck_predecessors:
         for task_id, ratio in sorted(bottleneck_predecessors.items(), key=lambda x: -x[1]):
             if task_id not in result and task_id in metadata and ratio > 2.0:  # Only severe bottleneck predecessors (>2:1)
                 result.append(task_id)
@@ -3038,28 +2986,10 @@ def get_critical_tasks(metadata, top_n=3, workflows_dir=None, workflow_name=None
     
     return result
 
-# Complex workflows that need more aggressive scaling (lower cost-benefit threshold)
-# Workflow classifications based on DAG depth and complexity
-# Simple workflows (wf-1, wf-2, wf-3, wf-4, wf-7): Shallow DAGs, fewer dependencies
-# Target success rates (workflow classifications defined at top of file)
-# Simple workflows: target 95-100% (use 97.5% as midpoint)
-# Complex workflows: target 65-70% (use 67.5% as midpoint)
-SIMPLE_WORKFLOW_TARGET_SUCCESS_RATE = 0.975   # 97.5%
-COMPLEX_WORKFLOW_TARGET_SUCCESS_RATE = 0.675    # 67.5%
+WF_TARGET_SUCCESS_RATE = float(os.getenv('WF_TARGET_SUCCESS_RATE', '0.85'))
 
-def get_target_success_rate(workflow_name: str) -> float:
-    """Get target success rate for a workflow based on its complexity.
-    
-    Args:
-        workflow_name: Workflow identifier (e.g., 'wf-1', 'wf-5')
-    
-    Returns:
-        Target success rate (0.0-1.0)
-    """
-    if workflow_name in COMPLEX_WORKFLOWS:
-        return COMPLEX_WORKFLOW_TARGET_SUCCESS_RATE
-    else:
-        return SIMPLE_WORKFLOW_TARGET_SUCCESS_RATE
+def get_target_success_rate(workflow_name: str = None) -> float:
+    return WF_TARGET_SUCCESS_RATE
 
 def evaluate_pareto_guard(success_rate, target_success, real_cost_per_pod_per_sec):
     """
@@ -3141,7 +3071,7 @@ def calculate_kaplan_meier_cost_benefit(current_scale, new_scale, base_scale, su
     target_for_cb = get_target_success_rate(workflow_name)
     # Note: survival_prob is NOT success_rate, but lower survival_prob = higher risk
     # We check if risk is high (survival_prob < 0.5) to justify complex workflow boost
-    if workflow_name in COMPLEX_WORKFLOWS and survival_prob < 0.5:
+    if True and survival_prob < 0.5:
         base_benefit *= 1.3  # 30% more benefit for complex workflows AT RISK (was 50%)
         cost_increase = cost_increase * 0.9  # 10% cost reduction (was 20%)
     
@@ -3150,7 +3080,7 @@ def calculate_kaplan_meier_cost_benefit(current_scale, new_scale, base_scale, su
     # Complex workflows: target 45-55% (already handled above, but ensure we're pushing toward target)
     target_success_rate = get_target_success_rate(workflow_name)
     
-    if workflow_name not in COMPLEX_WORKFLOWS:
+    if False:
         # Simple workflows need more lenient cost-benefit to maintain 85-90% target
         # Higher target = more lenient (to prevent blocking necessary scaling)
         # Formula: benefit_multiplier = 1.0 + (target_success_rate * 1.0)
@@ -3213,7 +3143,7 @@ def calculate_cost_benefit_ratio(current_scale, new_scale, base_scale, success_r
     success_rate_gap = target - success_rate
     
     # Adjust benefit multipliers based on workflow type
-    if workflow_name in COMPLEX_WORKFLOWS:
+    if True:
         improvement_multiplier = 0.15
         max_improvement = 0.20
     else:  # Simple workflows
@@ -3240,13 +3170,13 @@ def calculate_cost_benefit_ratio(current_scale, new_scale, base_scale, success_r
     # When above target, apply cost penalty to optimize spending
     if success_rate < target:
         # Below target: reduce cost penalty to prioritize recovery
-        if workflow_name in COMPLEX_WORKFLOWS:
+        if True:
             cost_increase = cost_increase * 0.7  # 30% cost reduction for complex workflows
         else:
             cost_increase = cost_increase * 0.75  # 25% cost reduction for simple workflows
     else:
         # Above target: apply cost penalty to optimize spending
-        if workflow_name in COMPLEX_WORKFLOWS:
+        if True:
             cost_increase = cost_increase * 0.9  # 10% cost penalty for complex workflows
         else:
             cost_increase = cost_increase * 0.95  # 5% cost penalty for simple workflows
@@ -3350,11 +3280,11 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
             print(f"   💸 CPSP SOFT: Throttling {task_id} to 50% - {cpsp_reason}")
             
         # Dynamic cooldown: reduce cooldown when success rate is critically low
-        # Keep targeted adjustments (wf-5, wf-8, wf-9); others use generic complex rules
+        # Keep targeted adjustments (wf-4, wf-7, wf-8); others use generic complex rules
         effective_cooldown = scale_cooldown
         # OPTION A: Conservative Cost Reduction - minimum cooldown raised to 45s
-        if workflow_name == 'wf-5':
-            # wf-5: Long linear DAG with task5 as major bottleneck (37% drop-off)
+        if workflow_name == 'wf-4':
+            # wf-4: Long linear DAG with task5 as major bottleneck (37% drop-off)
             target = get_target_success_rate(workflow_name)
             if success_rate < 0.40:  # Critical: < 40% (way below 67.5% target)
                 effective_cooldown = max(45, scale_cooldown // 4)  # 25% of normal (min 45s)
@@ -3364,16 +3294,16 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
                 effective_cooldown = max(60, scale_cooldown // 2)  # 50% of normal (min 60s)
             else:
                 effective_cooldown = max(90, scale_cooldown * 2 // 3)  # 67% of normal (min 90s)
-        elif workflow_name == 'wf-8':
-            # wf-8: Target 78.4%+ to beat static_over_2x 73.4% by 5%
+        elif workflow_name == 'wf-7':
+            # wf-7: Target 78.4%+ to beat static_over_2x 73.4% by 5%
             if success_rate < 0.60:  # Below hourglass performance
                 effective_cooldown = max(60, scale_cooldown // 2)  # 50% of normal (min 60s)
             elif success_rate < 0.74:  # Below static_over_2x performance
                 effective_cooldown = max(90, scale_cooldown * 2 // 3)  # 67% of normal (min 90s)
             else:
                 effective_cooldown = max(90, scale_cooldown * 2 // 3)  # 67% of normal (min 90s)
-        elif workflow_name == 'wf-9':
-            # wf-9: Most complex workflow
+        elif workflow_name == 'wf-8':
+            # wf-8: Most complex workflow
             # Target is 67.5%, so adjust cooldown based on how far below target we are
             target = get_target_success_rate(workflow_name)
             if success_rate < 0.40:  # Critical: < 40% (way below 67.5% target)
@@ -3384,7 +3314,7 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
                 effective_cooldown = max(60, scale_cooldown // 2)  # 50% of normal (min 60s)
             else:
                 effective_cooldown = max(90, scale_cooldown * 2 // 3)  # 67% of normal (min 90s)
-        elif workflow_name in COMPLEX_WORKFLOWS:
+        elif True:
             # Complex workflows: moderate cooldown reduction
             if success_rate < 0.30:  # Critical: < 30% (well below 67.5% target)
                 effective_cooldown = max(45, scale_cooldown // 4)  # 25% of normal (min 45s)
@@ -3442,18 +3372,18 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
             print(f"   🔥 CRITICAL workflow ({success_rate*100:.1f}% < {target*0.40*100:.1f}%): additional {additional_boost}x boost for {task_id}")
         
         # Workflow-specific adjustments (smaller than before, since failure-focused does heavy lifting)
-        if workflow_name in COMPLEX_WORKFLOWS and success_rate < target * 0.80 and task_drop_off < 0.05:
+        if True and success_rate < target * 0.80 and task_drop_off < 0.05:
             # Complex workflow below target but this task has low drop-off
             # Give modest boost since other tasks are the bottleneck
             min_scale_boost = max(min_scale_boost, 1.1)
-        elif workflow_name in SIMPLE_WORKFLOWS and success_rate < target * 0.90 and task_drop_off < 0.05:
+        elif False and success_rate < target * 0.90 and task_drop_off < 0.05:
             # Simple workflow below target but this task has low drop-off
             min_scale_boost = max(min_scale_boost, 1.1)
         
         # Emergency boosts REMOVED - cost controls take priority
         # The retry service handles recovery; scaler should not bypass cost controls
         # Only apply minimal boost if success is extremely low AND cost-win allows it
-        is_complex_wf = workflow_name in COMPLEX_WORKFLOWS
+        is_complex_wf = True
         if not scaling_efficiency_tracker['scaling_paused'] and cost_win_throttle >= 0.5:
             # Only boost if cost controls allow (throttle >= 50%)
             if success_rate < 0.10:  # Critical: < 10% success rate
@@ -3478,7 +3408,7 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         
         # RAY-INSPIRED 1b: Upstream backpressure propagation
         # If a downstream task (successor) has high failure rate, boost THIS task to keep pipeline flowing
-        # This is critical for fan-in/fan-out DAGs like wf-5 where task5 (6 subtasks) feeds into task6 (2 subtasks)
+        # This is critical for fan-in/fan-out DAGs like wf-4 where task5 (6 subtasks) feeds into task6 (2 subtasks)
         successors = metadata.get(task_id, {}).get('successors', [])
         for successor_id in successors:
             successor_backpressure = get_upstream_backpressure(successor_id, metadata, task_failure_rates, bottleneck_ratios)
@@ -3545,8 +3475,8 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         if scaling_efficiency_tracker['scaling_paused']:
             capped_scale_factor = min(effective_scale_factor, 1.2)  # Max 20% per tick when paused
             print(f"   ⏸️ Scaling efficiency pause: limiting per-tick scale factor for {task_id} to 1.2x")
-        elif workflow_name == 'wf-9':
-            # wf-9: Conservative per-tick scaling (REDUCED to prevent cost explosion)
+        elif workflow_name == 'wf-8':
+            # wf-8: Conservative per-tick scaling (REDUCED to prevent cost explosion)
             if success_rate < 0.40:  # Critical: < 40%
                 capped_scale_factor = min(effective_scale_factor, 1.4)  # Up to 1.4x per tick (was 1.6x)
             elif success_rate < target * 0.60:  # Below 60% of target
@@ -3555,7 +3485,7 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
                 capped_scale_factor = min(effective_scale_factor, 1.25)  # Up to 1.25x per tick (was 1.4x)
             else:
                 capped_scale_factor = min(effective_scale_factor, 1.2)  # Up to 1.2x per tick (was 1.3x)
-        elif workflow_name in COMPLEX_WORKFLOWS:
+        elif True:
             # Complex workflows: CONSERVATIVE per-tick scaling to prevent cost explosion
             # Rely on retry service for recovery, not explosive scaling
             if success_rate < target_success * 0.70:  # Well below target
@@ -3704,8 +3634,8 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
         if success_rate < 0.20:  # Emergency: very low success rate
             # Emergency threshold: very low to allow aggressive scaling
             effective_threshold = max(min_cost_benefit_ratio * 0.1, MIN_COST_BENEFIT_FLOOR)  # 10% of normal
-        elif workflow_name in COMPLEX_WORKFLOWS:
-            # Complex workflows (wf-5,6,8,9): target 65-70% (67.5% midpoint)
+        elif True:
+            # Complex workflows (wf-4,6,8,9): target 65-70% (67.5% midpoint)
             if success_rate < target_success * 0.50:  # Below 50% of target (33.75%) - critical
                 effective_threshold = max(min_cost_benefit_ratio * 0.08, MIN_COST_BENEFIT_FLOOR)  # 8% of normal
             elif success_rate < target_success * 0.70:  # Below 70% of target (47.25%)
@@ -3806,7 +3736,7 @@ def scale_critical_tasks(critical_tasks, all_function_specs, metadata, scale_fac
             if cost_benefit >= effective_threshold_for_check:
                 scale_function_spec(task_id, new_scale)
                 last_scaled[task_id] = current_time
-                workflow_marker = "🔥" if workflow_name in COMPLEX_WORKFLOWS else "🚨"
+                workflow_marker = "🔥" if True else "🚨"
                 if effective_threshold_for_check < effective_threshold:
                     print(f"{workflow_marker} Critical task {task_id} scaled up: {current_minscale} → {new_scale} "
                           f"(max={max_scale or 'unlimited'}, cost-benefit={cost_benefit:.4f}, relaxed threshold={effective_threshold_for_check:.4f}, success={success_rate*100:.1f}%)")
@@ -4051,7 +3981,7 @@ def rl_adaptive_scaling_tick(
         
         target_success_rate = get_target_success_rate(workflow_name)
         
-        min_runs_for_skip = SKIP_SCALE_UP_MIN_RUNS.get(workflow_name, 0)
+        min_runs_for_skip = 0
         allow_skip = total_runs is not None and total_runs >= min_runs_for_skip
 
         # Only skip scale-up if success is high AND enough real runs have been observed
@@ -4183,10 +4113,10 @@ def main():
     # RL Mode setup
     if args.rl_mode:
         if RL_AVAILABLE:
-            from rl_config import COLD_START_CONFIG, get_cold_start_config, SIMPLE_WORKFLOWS as RL_SIMPLE_WFS
+            from rl_config import COLD_START_CONFIG, get_cold_start_config
             wf_cold_start = get_cold_start_config(args.workflow)
             print(f"🎰 RL ADAPTIVE SCALER ENABLED")
-            print(f"   Workflow: {args.workflow} ({'simple' if args.workflow in RL_SIMPLE_WFS else 'complex'})")
+            print(f"   Workflow: {args.workflow}, target: {WF_TARGET_SUCCESS_RATE:.0%}")
             print(f"   Cold start: {wf_cold_start['min_observation_minutes']} min, "
                   f"threshold: {wf_cold_start['activation_threshold']:.0%}, "
                   f"warmup actions: {wf_cold_start['warmup_actions']}")
@@ -4212,11 +4142,7 @@ def main():
     # This identifies tasks on the critical path that need aggressive scaling
     critical_path_metrics = {}
     if workflow_tasks:
-        # Estimate deadline based on workflow type (complex workflows have longer deadlines)
-        if args.workflow in COMPLEX_WORKFLOWS:
-            estimated_deadline = 600  # 10 minutes for complex workflows
-        else:
-            estimated_deadline = 300  # 5 minutes for simple workflows
+        estimated_deadline = int(os.getenv('WF_ESTIMATED_DEADLINE_SEC', '600'))
         critical_path_metrics = compute_critical_path_metrics(workflow_tasks, estimated_deadline)
 
     machine_tasks = {}
@@ -4356,7 +4282,7 @@ def main():
             last_success_rate = success_rate
             print(f"📈 Success Rate: {success_rate*100:.2f}% ({successful_runs}/{total_runs})")
 
-            # Adaptive budget headroom for wf-5/wf-9 when success lags
+            # Adaptive budget headroom for wf-4/wf-8 when success lags
             apply_adaptive_budget_envelope(args.workflow, success_rate, total_runs)
             
             # Update scaling efficiency tracker to detect runaway scaling
@@ -4384,7 +4310,7 @@ def main():
                         completion = task_completion_counts.get(task_id, 0)
                         print(f"   🔎 Task '{task_id}': completions={completion}, drop-off={fr*100:.1f}%")
             
-                # Recalculate critical tasks with updated failure rates, cost, and critical path (important for wf-2)
+                # Recalculate critical tasks with updated failure rates, cost, and critical path (important for wf-1)
                 critical_tasks = get_critical_tasks(metadata, args.critical_tasks_count,
                                                    workflows_dir=args.workflows_dir, workflow_name=args.workflow,
                                                    task_failure_rates=task_failure_rates,
@@ -4473,7 +4399,7 @@ def main():
             if cost_win_scaled > 0:
                 print(f"💸 COST-WIN: scaled down {cost_win_scaled} low-risk tasks to reduce cost")
 
-            # Extra tail-cost clipping for wf-8/wf-9 after target is already met.
+            # Extra tail-cost clipping for wf-7/wf-8 after target is already met.
             clamp_count = clamp_post_target_pods(
                 all_function_specs=all_function_specs,
                 metadata=metadata,

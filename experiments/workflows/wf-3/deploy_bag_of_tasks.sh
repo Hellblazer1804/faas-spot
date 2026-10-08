@@ -51,12 +51,12 @@ data:
   WORKFLOW_ID: "wf-3"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task2"
   BASELINE: "bag_of_tasks"
-  TASK_EXEC_TIME: "1.7968"
+  TASK_EXEC_TIME: "8.9554"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_TASKS: "5"
-  TOTAL_WORKFLOW_EXEC_TIME: "30.0072"
+  TOTAL_WORKFLOW_TASKS: "4"
+  TOTAL_WORKFLOW_EXEC_TIME: "36.554"
   CKPT_STRATEGY: "probabilistic"
   BOT_INITIAL_CREDITS: "100.0"
   BOT_CREDIT_EARN_RATE: "5.0"
@@ -64,9 +64,9 @@ data:
   BOT_HIBERNATION_ENABLED: "true"
 CMEOF
 
-echo "Creating function task1 (min=1, max=11) for baseline bag_of_tasks..."
+echo "Creating function task1 (min=3, max=31) for baseline bag_of_tasks..."
 fission fn delete --name task1 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-3-task1-bag-of-tasks-cfg -n $NS
+fission fn create --name task1 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-3-task1-bag-of-tasks-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task1"
 
@@ -86,12 +86,12 @@ data:
   WORKFLOW_ID: "wf-3"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task3"
   BASELINE: "bag_of_tasks"
-  TASK_EXEC_TIME: "9.606"
+  TASK_EXEC_TIME: "6.2269"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_TASKS: "5"
-  TOTAL_WORKFLOW_EXEC_TIME: "30.0072"
+  TOTAL_WORKFLOW_TASKS: "4"
+  TOTAL_WORKFLOW_EXEC_TIME: "36.554"
   CKPT_STRATEGY: "probabilistic"
   BOT_INITIAL_CREDITS: "100.0"
   BOT_CREDIT_EARN_RATE: "5.0"
@@ -99,9 +99,9 @@ data:
   BOT_HIBERNATION_ENABLED: "true"
 CMEOF
 
-echo "Creating function task2 (min=3, max=31) for baseline bag_of_tasks..."
+echo "Creating function task2 (min=2, max=21) for baseline bag_of_tasks..."
 fission fn delete --name task2 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-3-task2-bag-of-tasks-cfg -n $NS
+fission fn create --name task2 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 2 --maxscale 21 --fntimeout 120 --method POST --configmap wf-3-task2-bag-of-tasks-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task2"
 
@@ -121,12 +121,12 @@ data:
   WORKFLOW_ID: "wf-3"
   NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task4"
   BASELINE: "bag_of_tasks"
-  TASK_EXEC_TIME: "6.2568"
+  TASK_EXEC_TIME: "13.1139"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_TASKS: "5"
-  TOTAL_WORKFLOW_EXEC_TIME: "30.0072"
+  TOTAL_WORKFLOW_TASKS: "4"
+  TOTAL_WORKFLOW_EXEC_TIME: "36.554"
   CKPT_STRATEGY: "probabilistic"
   BOT_INITIAL_CREDITS: "100.0"
   BOT_CREDIT_EARN_RATE: "5.0"
@@ -154,14 +154,14 @@ metadata:
 data:
   TASK_ID: "task4"
   WORKFLOW_ID: "wf-3"
-  NEXT_TASK_URL: "http://router.fission.svc.cluster.local/fission-function/task5"
+  NEXT_TASK_URL: ""
   BASELINE: "bag_of_tasks"
-  TASK_EXEC_TIME: "7.6692"
+  TASK_EXEC_TIME: "8.2578"
   SCALE_FACTOR: "1.25"
   AZ: "us-west-2a"
   INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_TASKS: "5"
-  TOTAL_WORKFLOW_EXEC_TIME: "30.0072"
+  TOTAL_WORKFLOW_TASKS: "4"
+  TOTAL_WORKFLOW_EXEC_TIME: "36.554"
   CKPT_STRATEGY: "probabilistic"
   BOT_INITIAL_CREDITS: "100.0"
   BOT_CREDIT_EARN_RATE: "5.0"
@@ -174,41 +174,6 @@ fission fn delete --name task4 -n $NS >/dev/null 2>&1 || true
 fission fn create --name task4 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 3 --maxscale 31 --fntimeout 120 --method POST --configmap wf-3-task4-bag-of-tasks-cfg -n $NS
 sleep 3
 wait_rollout_for_task "task4"
-
-echo "Applying ConfigMap wf-3-task5-bag-of-tasks-cfg..."
-kubectl -n $NS apply -f - <<CMEOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wf-3-task5-bag-of-tasks-cfg
-  labels:
-    app: serverless-wf
-    wf-id: wf-3
-    task-id: task5
-    baseline: bag_of_tasks
-data:
-  TASK_ID: "task5"
-  WORKFLOW_ID: "wf-3"
-  NEXT_TASK_URL: ""
-  BASELINE: "bag_of_tasks"
-  TASK_EXEC_TIME: "4.6784"
-  SCALE_FACTOR: "1.25"
-  AZ: "us-west-2a"
-  INSTANCE_TYPE: "v100"
-  TOTAL_WORKFLOW_TASKS: "5"
-  TOTAL_WORKFLOW_EXEC_TIME: "30.0072"
-  CKPT_STRATEGY: "probabilistic"
-  BOT_INITIAL_CREDITS: "100.0"
-  BOT_CREDIT_EARN_RATE: "5.0"
-  BOT_CREDIT_BURST_COST: "20.0"
-  BOT_HIBERNATION_ENABLED: "true"
-CMEOF
-
-echo "Creating function task5 (min=1, max=11) for baseline bag_of_tasks..."
-fission fn delete --name task5 -n $NS >/dev/null 2>&1 || true
-fission fn create --name task5 --env $ENV_NAME --code $TASK_TEMPLATE --executortype newdeploy --minscale 1 --maxscale 11 --fntimeout 120 --method POST --configmap wf-3-task5-bag-of-tasks-cfg -n $NS
-sleep 3
-wait_rollout_for_task "task5"
 
 echo "Recreating route wf-3-route ..."
 fission route delete --name=wf-3-route -n $NS >/dev/null 2>&1 || true

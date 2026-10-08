@@ -1,0 +1,9 @@
+discord.py>=2.3.0
+kubernetes
+matplotlib
+mysql-connector-python
+numpy
+pandas
+pymysql
+redis
+requests
