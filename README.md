@@ -3,7 +3,7 @@
 **Fault-Tolerant Serverless Workflow Execution on Spot Instances**
 
 > Paper: FaaSpot: Fault-Tolerant Serverless Workflow Execution on Spot Instances  
-> Submitted to ACM Middleware 2026
+> Accepted at ACM Middleware 2026
 
 ---
 
