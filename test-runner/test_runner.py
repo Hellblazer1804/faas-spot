@@ -15,31 +15,38 @@ from typing import Optional, Tuple, Dict
 from kubernetes import client, config
 
 from discord import init_discord_notifications, get_discord_notifier
+from cost_eval import (
+    get_total_cost_from_db,
+    get_budget_for_workflow,
+    get_budget_override_percent,
+    extract_cost_from_scaler_log,
+)
 
-# Database configuration (same as scaler)
+# Database configuration
 DB_CONFIG = {
     'user':     os.getenv('DB_USER', ''),
     'password': os.getenv('DB_PASSWORD', ''),
     'host':     os.getenv('DB_HOST', 'localhost'),
     'database': os.getenv('DB_NAME', ''),
 }
+
 # --- Paths & Constants ---
 TESTER_DIR          = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT           = os.path.dirname(TESTER_DIR)
 WORKFLOWS_DIR       = os.path.join(TESTER_DIR, "workflows")
-RANKER_SCRIPT       = os.path.join(TESTER_DIR, "../Ranker/heft_rank_identifier.py")
-SCALER_SCRIPT       = os.path.join(TESTER_DIR, "../Scaler/preemptive_scaler.py")
-EMULATOR_SCRIPT     = os.path.join(TESTER_DIR, "../New-Emulator/Emulator.py")
-CHECKPOINTER_SCRIPT = os.path.join(TESTER_DIR, "../Checkpoint-Planner/checkpointer.py")
-EVAL_SCRIPT         = os.path.join(TESTER_DIR, "../Experiments/evaluation-scripts/success_rate.py")
-CLEANUP_SCRIPT      = os.path.join(TESTER_DIR, "../Experiments/cleanup.sh")
-SURVIVAL_CURVE_PATH = os.path.join(TESTER_DIR, "../Scaler/survival_curves/us-west-2a_v100_cdf_survival_curve.json")
-LOADGEN_SCRIPT      = os.path.join(TESTER_DIR, "load_generator.py")
-RETRY_SERVICE_SCRIPT = os.path.join(TESTER_DIR, "../Retry-Service-v2/retry_service.py")
+RANKER_SCRIPT       = os.path.join(REPO_ROOT, "task-ranker", "heft_rank_identifier.py")
+SCALER_SCRIPT       = os.path.join(REPO_ROOT, "adaptive-scaler", "preemptive_scaler.py")
+EMULATOR_SCRIPT     = os.path.join(REPO_ROOT, "spot-emulator", "Emulator.py")
+CHECKPOINTER_SCRIPT = os.path.join(REPO_ROOT, "checkpoint-planner", "checkpointer.py")
+EVAL_SCRIPT         = os.path.join(REPO_ROOT, "experiments", "evaluation-scripts", "success_rate.py")
+CLEANUP_SCRIPT      = os.path.join(TESTER_DIR, "cleanup.sh")
+SURVIVAL_CURVE_PATH = os.path.join(REPO_ROOT, "adaptive-scaler", "survival_curves",
+                                   "us-west-2a_v100_cdf_survival_curve.json")
+LOADGEN_SCRIPT      = os.path.join(REPO_ROOT, "load-generator", "adaptive_load_generator.py")
+RETRY_SERVICE_SCRIPT = os.path.join(REPO_ROOT, "retry-manager", "retry_service.py")
 RETRY_SERVICE_DIR    = os.path.dirname(RETRY_SERVICE_SCRIPT)
 EMULATOR_DIR        = os.path.dirname(EMULATOR_SCRIPT)
-# Checkscale: every task checkpointed (task templates write checkpoint on completion);
-# retry service prioritizes retries from checkpointer-selected tasks; when success drops
-# below threshold, also retries from non-selected checkpoints (Retry-Service-v2).
+
 BASELINE            = "ours"
 NAMESPACE           = "default"
 EXPERIMENT_TAG      = os.getenv("EXPERIMENT_TAG", "main_experiment")
@@ -64,25 +71,11 @@ WF_TARGET_SUCCESS_RATE = float(os.getenv('WF_TARGET_SUCCESS_RATE', '0.85')) * 10
 def get_target_success_rate(workflow_name: str = None) -> float:
     return WF_TARGET_SUCCESS_RATE
 
-# -----------------------------
-# Cost Calculation from Database (same as scaler)
-# -----------------------------
-# Machine packing: 3 pods share 1 machine
-PODS_PER_MACHINE = 3
-
-# Emulator time compression: 1 real second = 60 emulator seconds
+PODS_PER_MACHINE       = 3
 EMULATOR_TIME_COMPRESSION = 60
-
-# Budget as percentage of on-demand cost
-# Updated: 50% hard cap includes all costs (scaling, retry, churn)
-# Exception: wf-4 and wf-8 get 60% base (adaptive in scaler)
-WF_BUDGET_PERCENT  = float(os.getenv('WF_BUDGET_PERCENT', '0.50'))
-CHURN_OVERHEAD_FACTOR = 1.0
-
-# RL Adaptive Scaler mode (contextual bandit for scaling decisions)
-# Cold start and activation settings are now workflow-specific in rl_config.py
-# The scaler reads them from the config at runtime, no need to pass via CLI
-RL_MODE_ENABLED = True  # Set to True to enable RL-based scaling decisions
+WF_BUDGET_PERCENT      = float(os.getenv('WF_BUDGET_PERCENT', '0.50'))
+CHURN_OVERHEAD_FACTOR  = 1.0
+RL_MODE_ENABLED        = True
 
 def env_flag(name: str) -> bool:
     val = os.getenv(name, "").strip().lower()
@@ -158,399 +151,7 @@ def ensure_metadata_columns():
     except Exception as e:
         print(f"⚠️ Failed to ensure notes columns: {e}")
 
-def task_from_podname(pod_name: str) -> str:
-    """Extract task name from pod name (e.g., 'task1-abc123' -> 'task1')."""
-    if not pod_name:
-        return ""
-    # Pod names are like 'task1-abc123-xyz' - extract the task part
-    parts = pod_name.split('-')
-    if parts:
-        return parts[0]
-    return pod_name
-
-def normalize_baseline(value: Optional[str]) -> str:
-    """Normalize baseline names for consistent comparison."""
-    if value is None:
-        return ""
-    normalized = str(value).strip().lower()
-    if normalized in {"none", "nan", ""}:
-        return ""
-    return normalized
-
-def compute_cost_per_wf_baseline(cost_df, evals_df, task_to_wf, wf_minscale):
-    if cost_df is None or cost_df.empty:
-        import pandas as pd
-        return pd.DataFrame(columns=["workflow_name", "baseline", "total_cost"])
-
-    import pandas as pd
-    import numpy as np
-
-    c = cost_df.copy()
-    c.columns = [x.strip() for x in c.columns]
-    c["workflow_name"] = c.get("workflow_name", "").astype(str).str.strip().str.lower()
-    c["baseline"] = c.get("baseline", "").astype(str).map(normalize_baseline)
-
-    if "timestamp" in c.columns:
-        c["ts"] = pd.to_datetime(c["timestamp"], errors="coerce")
-    else:
-        c["ts"] = pd.NaT
-    for col in ["pod_age_seconds", "price_per_hour"]:
-        if col in c.columns:
-            c[col] = pd.to_numeric(c[col], errors="coerce")
-
-    c["task"] = c["pod_name"].apply(task_from_podname)
-    mask_missing_wf = (c["workflow_name"] == "") | (c["workflow_name"].isna())
-    if mask_missing_wf.any():
-        c.loc[mask_missing_wf, "workflow_name"] = c.loc[mask_missing_wf, "task"].map(task_to_wf).fillna("unknown")
-    c = c[c["workflow_name"] != "unknown"].copy()
-
-    # Assign machine IDs: 3 pods share 1 machine
-    # Build pod_index mapping for each (workflow, task) group, then assign machine_id
-    # Using iterative approach to avoid pandas groupby.apply returning DataFrame issue
-    c["machine_id"] = 1  # Initialize with default
-    for (wf, task), group_idx in c.groupby(["workflow_name", "task"]).groups.items():
-        group_pods = sorted(c.loc[group_idx, "pod_name"].unique())
-        pod_index = {p: i for i, p in enumerate(group_pods)}
-        for idx in group_idx:
-            pod_name = c.loc[idx, "pod_name"]
-            pod_idx = pod_index.get(pod_name, 0)
-            c.loc[idx, "machine_id"] = (pod_idx // 3) + 1
-    c["machine_id"] = c["machine_id"].astype(int)
-
-    windows = evals_df.groupby(["workflow_name", "baseline"], as_index=False).agg(
-        t0=("start_time", "min"), t1=("end_time", "max")
-    )
-    windows["t0_dt"] = pd.to_datetime(windows["t0"], unit="s", errors="coerce")
-    windows["t1_dt"] = pd.to_datetime(windows["t1"], unit="s", errors="coerce")
-
-    totals = []
-    for wf, base, t0, t1, t0d, t1d in windows[["workflow_name", "baseline", "t0", "t1", "t0_dt", "t1_dt"]].itertuples(index=False):
-        d = c[(c["workflow_name"] == wf) & (c["baseline"] == base)]
-        if d.empty:
-            totals.append((wf, base, 0.0))
-            continue
-        if d["ts"].notna().any() and pd.notna(t0d) and pd.notna(t1d):
-            di = d[(d["ts"] >= t0d) & (d["ts"] <= t1d)].copy()
-            if di.empty:
-                di = d.copy()
-        else:
-            di = d.copy()
-        di = di.sort_values(["pod_name", "ts"], kind="mergesort")
-        di["prev_age"] = di.groupby("pod_name")["pod_age_seconds"].shift(1)
-        di["delta_age_sec"] = (di["pod_age_seconds"] - di["prev_age"]).clip(lower=0)
-        if "check_interval_seconds" in di.columns:
-            sel = di["delta_age_sec"].isna() | (di["delta_age_sec"] == 0)
-            di.loc[sel, "delta_age_sec"] = di.loc[sel, "check_interval_seconds"].fillna(0)
-        else:
-            di["delta_age_sec"] = di["delta_age_sec"].fillna(0)
-
-        # Machine packing: 3 pods per machine - only charge once per machine
-        # For each (task, machine_id), take the max delta_age_sec across pods sharing that machine
-        # Then charge for the machine time, not individual pod times
-        di["price_per_hour"] = pd.to_numeric(di["price_per_hour"], errors="coerce").fillna(0)
-
-        # Compute machine-level stats: prefer lifetime = max_age - min_age across pods
-        # Fallback to max_delta_sec when age values are missing or non-informative.
-        # Compute machine-level stats: prefer lifetime = max_age - min_age across pods
-        # Fallback to max_delta_sec when age values are missing or non-informative.
-        machine_stats = di.groupby(["task", "machine_id"], observed=False).agg(
-            min_age=("pod_age_seconds", "min"),
-            max_age=("pod_age_seconds", "max"),
-            max_delta_sec=("delta_age_sec", "max")
-        ).reset_index()
-
-        # Choose the price from the oldest observed pod on the machine (the row with max_age)
-        price_map = (
-            di.sort_values(["task", "machine_id", "pod_age_seconds"], ascending=[True, True, False])
-              .groupby(["task", "machine_id"], observed=False)
-              .first()
-              .reset_index()[["task", "machine_id", "price_per_hour"]]
-        )
-        machine_stats = machine_stats.merge(price_map, on=["task", "machine_id"], how="left")
-        machine_stats["price_per_hour"] = pd.to_numeric(machine_stats["price_per_hour"], errors="coerce").fillna(0)
-
-        # Simplified VM lifetime: use the oldest pod's age (max_age) as machine lifetime
-        # If max_age is missing or non-positive, fall back to the previous max per-pod delta.
-        machine_stats["machine_lifetime_sec"] = machine_stats["max_age"].fillna(np.nan)
-
-        # Use only the oldest pod's age as the machine lifetime (no fallback)
-        machine_stats["effective_sec"] = machine_stats["machine_lifetime_sec"].fillna(0)
-
-        # Convert seconds to hours and compute cost
-        machine_stats["spot_hours"] = machine_stats["effective_sec"] / 3600.0
-        machine_stats["cost"] = machine_stats["price_per_hour"] * machine_stats["spot_hours"]
-
-        totals.append((wf, base, float(machine_stats["cost"].sum())))
-    res = pd.DataFrame(totals, columns=["workflow_name", "baseline", "total_cost"])
-    present_wf = evals_df["workflow_name"].unique()
-    res = res[res["workflow_name"].isin(present_wf)]
-    return res
-
-def get_total_cost_from_db(workflow_name: str, baseline: str) -> Dict[str, Optional[float]]:
-    """
-    Get total cost from the cost_logs table in the database.
-    Uses compute_cost_per_wf_baseline for machine packing cost.
-    
-    Steps:
-    1. Load eval windows from serverless_workflows
-    2. Load cost_logs for workflow/baseline
-    3. Use compute_cost_per_wf_baseline to calculate total cost
-    
-    Returns dict with:
-        - total_cost: Total cost spent during experiment
-        - avg_price_per_hour: Average spot price per hour (per machine)
-        - sample_count: Number of cost log entries
-        - total_runtime_seconds: Total experiment runtime in real seconds
-        - normalized_cost: Cost relative to budget
-    """
-    result = {
-        'total_cost': None,
-        'avg_price_per_hour': None,
-        'sample_count': 0,
-        'total_runtime_seconds': None,
-        'normalized_cost': None
-    }
-    
-    try:
-        import pandas as pd
-        conn = mysql_connection()
-        cursor = conn.cursor(dictionary=True)
-        
-        # =====================================================================
-        # STEP 1: Load eval windows from serverless_workflows
-        # =====================================================================
-        eval_query = """
-            SELECT workflow_name, baseline, start_time, end_time
-            FROM serverless_workflows
-            WHERE workflow_name = %s AND baseline = %s
-        """
-        eval_params = [workflow_name, baseline]
-        if EXPERIMENT_TAG:
-            eval_query += " AND notes = %s"
-            eval_params.append(EXPERIMENT_TAG)
-        cursor.execute(eval_query, tuple(eval_params))
-        eval_rows = cursor.fetchall()
-        evals_df = pd.DataFrame(eval_rows)
-        if not evals_df.empty:
-            evals_df["workflow_name"] = evals_df["workflow_name"].astype(str).str.strip().str.lower()
-            evals_df["baseline"] = evals_df["baseline"].astype(str).map(normalize_baseline)
-        else:
-            # Fallback: create a windowless row so we still compute over all cost logs
-            evals_df = pd.DataFrame([{
-                "workflow_name": str(workflow_name).strip().lower(),
-                "baseline": normalize_baseline(baseline),
-                "start_time": None,
-                "end_time": None
-            }])
-            print("⚠️ No serverless_workflows rows found; using unbounded cost window.")
-
-        # =====================================================================
-        # STEP 2: Load cost_logs
-        # =====================================================================
-        cost_query = """
-            SELECT
-                workflow_name,
-                baseline,
-                pod_name,
-                pod_age_seconds,
-                price_per_hour,
-                check_interval_seconds,
-                timestamp
-            FROM cost_logs
-            WHERE workflow_name = %s AND baseline = %s
-        """
-        cost_params = [workflow_name, baseline]
-        if EXPERIMENT_TAG:
-            cost_query += " AND notes = %s"
-            cost_params.append(EXPERIMENT_TAG)
-        cost_query += " ORDER BY pod_name, timestamp"
-        cursor.execute(cost_query, tuple(cost_params))
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        
-        print(f"📊 Found {len(rows)} cost_logs records for {workflow_name}/{baseline}")
-        
-        if not rows:
-            print(f"⚠️ No cost data found in DB for {workflow_name}/{baseline}")
-            return result
-        
-        cost_df = pd.DataFrame(rows)
-        sample_count = len(cost_df)
-        workflow_name_norm = str(workflow_name).strip().lower()
-        baseline_norm = normalize_baseline(baseline)
-
-        # Build task -> workflow mapping (for missing workflow_name in cost_logs)
-        task_to_wf = {}
-        tasks_path = os.path.join(WORKFLOWS_DIR, workflow_name, "tasks.json")
-        if os.path.exists(tasks_path):
-            try:
-                with open(tasks_path) as f:
-                    tasks_data = json.load(f).get("tasks", {})
-                task_to_wf = {task: workflow_name_norm for task in tasks_data.keys()}
-            except Exception:
-                task_to_wf = {}
-        if not task_to_wf:
-            task_to_wf = {task_from_podname(p): workflow_name_norm
-                          for p in cost_df["pod_name"].dropna().unique()}
-
-        cost_summary = compute_cost_per_wf_baseline(cost_df, evals_df, task_to_wf, wf_minscale={})
-        if cost_summary.empty:
-            print("⚠️ compute_cost_per_wf_baseline returned no cost rows.")
-            return result
-        match = cost_summary[
-            (cost_summary["workflow_name"] == workflow_name_norm) &
-            (cost_summary["baseline"] == baseline_norm)
-        ]
-        if match.empty:
-            print(f"⚠️ No cost row matched for {workflow_name}/{baseline}.")
-            return result
-
-        total_cost = float(match["total_cost"].iloc[0])
-        avg_price = float(pd.to_numeric(cost_df.get("price_per_hour"), errors="coerce").mean()) if "price_per_hour" in cost_df else 0.0
-
-        total_runtime_sec = None
-        try:
-            t0 = pd.to_numeric(evals_df["start_time"], errors="coerce").min()
-            t1 = pd.to_numeric(evals_df["end_time"], errors="coerce").max()
-            if pd.notna(t0) and pd.notna(t1):
-                total_runtime_sec = float(max(t1 - t0, 0))
-        except Exception:
-            total_runtime_sec = None
-        
-        result['total_cost'] = total_cost
-        result['avg_price_per_hour'] = avg_price
-        result['sample_count'] = sample_count
-        result['total_runtime_seconds'] = total_runtime_sec
-        
-        # Normalized cost: compare to budget (calculated elsewhere)
-        # We don't calculate normalized_cost here since it depends on budget
-        
-        time_filter_msg = "(filtered to experiment window)" if evals_df["start_time"].notna().any() else "(no time filter)"
-        print(f"💾 Cost from DB: ${total_cost:.2f} total, ${avg_price:.4f}/machine/hr avg, "
-              f"{sample_count} samples {time_filter_msg}")
-            
-    except Exception as e:
-        import traceback
-        print(f"⚠️ Error getting cost from database: {e}")
-        traceback.print_exc()
-    
-    return result
-
-def get_budget_for_workflow(workflow_name: str, az: str = "us-west-2a", instance: str = "v100") -> Optional[float]:
-    """
-    Calculate the budget for a workflow using the same logic as the scaler.
-    Budget = 50% of estimated on-demand cost (hard cap, includes scaling/retry/churn).
-    Total experiment on-demand cost is ~$60, so total budget cap is ~$30.
-    """
-    # Workflow runtime estimates (in REAL hours) - must match scaler's WORKFLOW_ESTIMATED_RUNTIME_HOURS
-    # Costs use real time (pod_age_seconds), so budget uses real hours
-    # UPDATED from run8/run9/run10: actual load generator durations are much longer
-    WORKFLOW_ESTIMATED_RUNTIME_HOURS = {
-        # Based on actual observed experiment runtimes from run8.log
-        # Load generator: 500 requests, concurrency=4, interval=0.25s, up to 60s timeout per request
-        'wf-1': 1.00,    # Simple: observed 3539s = 59 min (was 0.25)
-        'wf-1': 1.75,    # Simple with branches: observed 6211s = 103 min (was 0.33)
-        'wf-2': 1.65,    # Medium: observed 5820s = 97 min (was 0.50)
-        'wf-3': 1.85,    # Medium: observed 6527s = 109 min (was 0.50)
-        'wf-4': 2.10,    # Complex: observed 7363s = 123 min (was 1.60)
-        'wf-5': 1.50,    # Complex: ~90 real minutes estimated
-        'wf-6': 1.00,    # Medium: ~60 real minutes estimated
-        'wf-7': 1.50,    # Complex: ~90 real minutes estimated
-        'wf-8': 2.00,    # Most complex: ~120 real minutes estimated
-    }
-    
-    # Estimated machines per workflow (from tasks.json minscale / 3)
-    WORKFLOW_ESTIMATED_MACHINES = {
-        'wf-1': 2, 'wf-1': 3, 'wf-2': 4, 'wf-3': 4,
-        'wf-4': 11, 'wf-5': 12, 'wf-6': 5, 'wf-7': 14, 'wf-8': 16
-    }
-    
-    # Load on-demand price from spot cost CSV
-    try:
-        import pandas as pd
-        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cost_csv_path = os.path.join(script_dir, "Scaler", "spot-cost-csv", f"{az}_{instance}_cost.csv")
-        
-        if os.path.exists(cost_csv_path):
-            df = pd.read_csv(cost_csv_path)
-            avg_spot_price = df["SpotPrice ($)"].mean()
-            avg_savings = df["Savings (%)"].mean() / 100.0
-            # On-demand = spot / (1 - savings)
-            ondemand_price = avg_spot_price / (1 - avg_savings) if avg_savings < 1.0 else avg_spot_price * 3
-        else:
-            # Fallback prices
-            ondemand_price = 3.06
-    except Exception as e:
-        print(f"⚠️ Error loading spot prices: {e}")
-        ondemand_price = 3.06
-    
-    runtime_hours = WORKFLOW_ESTIMATED_RUNTIME_HOURS.get(workflow_name, 0.15)
-    estimated_machines = WORKFLOW_ESTIMATED_MACHINES.get(workflow_name, 6)
-    
-    budget_percent = WF_BUDGET_PERCENT
-    override_percent = get_budget_override_percent(workflow_name)
-    if override_percent is not None:
-        budget_percent = override_percent
-    
-    # Budget as percentage of on-demand cost
-    ondemand_cost = ondemand_price * runtime_hours * estimated_machines
-    budget = ondemand_cost * budget_percent * CHURN_OVERHEAD_FACTOR
-    
-    return budget
-
-def get_budget_override_percent(workflow_name: str):
-    if CHECKSCALE_BUDGET_OVERRIDE_PERCENT is None:
-        return None
-    if CHECKSCALE_BUDGET_OVERRIDE_WORKFLOWS and workflow_name not in CHECKSCALE_BUDGET_OVERRIDE_WORKFLOWS:
-        return None
-    return CHECKSCALE_BUDGET_OVERRIDE_PERCENT
-
-def extract_cost_from_scaler_log(log_path: str) -> Dict[str, Optional[float]]:
-    """
-    Fallback: Extract cost metrics from scaler log file if DB is unavailable.
-    """
-    result = {
-        'total_cost': None,
-        'budget': None,
-        'budget_remaining': None,
-        'normalized_cost': None,
-        'cost_per_pod_hour': None
-    }
-    
-    if not os.path.exists(log_path):
-        return result
-    
-    try:
-        with open(log_path, 'r') as f:
-            content = f.read()
-        
-        # Extract budget info: 💵 Budget: $X.XX/$Y.YY ($Z.ZZ remaining)
-        budget_pattern = r'💵 Budget: \$([0-9.]+)/\$([0-9.]+) \(\$([0-9.]+) remaining\)'
-        budget_matches = re.findall(budget_pattern, content)
-        if budget_matches:
-            last_match = budget_matches[-1]
-            result['total_cost'] = float(last_match[0])
-            result['budget'] = float(last_match[1])
-            result['budget_remaining'] = float(last_match[2])
-        
-        # Extract normalized cost from COST-WIN lines
-        norm_pattern = r'norm_cost=([0-9.]+)'
-        norm_matches = re.findall(norm_pattern, content)
-        if norm_matches:
-            result['normalized_cost'] = float(norm_matches[-1])
-        
-        # Check for BUDGET ENVELOPE initialization
-        envelope_pattern = r'Budget: \$([0-9.]+) \(([0-9]+)% of on-demand\)'
-        envelope_matches = re.findall(envelope_pattern, content)
-        if envelope_matches and result['budget'] is None:
-            result['budget'] = float(envelope_matches[0][0])
-    except Exception as e:
-        print(f"⚠️ Error parsing scaler log: {e}")
-    
-    return result
-
-# --- Global State & Helper Functions ---
+# --- Global State ---
 background_processes = []
 current_experiment = None
 _signal_handled = False
