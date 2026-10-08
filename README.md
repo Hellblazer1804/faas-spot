@@ -7,6 +7,11 @@
 
 ---
 
+## Developers
+Bandhan Patel --> bandhanpatel1804@gmail.com 
+Sushruth Harsha --> hsushruth@gmail.com
+
+---
 ## Overview
 
 Serverless workflows on spot instances fail frequently — complex DAG workflows see as low as 13% completion when deployed naively on spot VMs. A single preemption at a fan-out or synchronization barrier cascades into every parallel branch that shares it, turning one failure into many.
@@ -281,6 +286,3 @@ MIT License. See [LICENSE](LICENSE).
 
 -- 
 
-#Developers
-Bandan Patel --> bandhanpatel1804@gmail.com 
-Sushruth Harsha --> hsushruth@gmail.com
