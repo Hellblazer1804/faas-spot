@@ -278,3 +278,9 @@ Set `DISCORD_WEBHOOK_URL` in `.env` to receive experiment progress notifications
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+-- 
+
+#Developers
+Bandan Patel --> bandhanpatel1804@gmail.com 
+Sushruth Harsha --> hsushruth@gmail.com
