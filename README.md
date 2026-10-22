@@ -5,6 +5,8 @@
 > Paper: FaaSpot: Fault-Tolerant Serverless Workflow Execution on Spot Instances  
 > Accepted at ACM Middleware 2026
 
+Arxiv link --> https://arxiv.org/abs/2610.26709v1 
+
 ---
 
 ## Developers
@@ -282,39 +284,16 @@ Set `DISCORD_WEBHOOK_URL` in `.env` to receive experiment progress notifications
 ---
 ## Citation
 
-If you find this work to be useful please cite us :
+If you find this code or our work useful, please cite:
 
-```
-@inproceedings{10.1145/3801927.3858633,
-
-author = {Patel, Bandhan and Harsha, Sushruth and Oh, Kwangsung and Kim, In Kee},
-
-title = {FaaSpot: Fault-Tolerant Serverless Workflow Execution on Spot Instances},
-
-year = {2026},
-
-isbn = {9798400726217},
-
-publisher = {Association for Computing Machinery},
-
-address = {New York, NY, USA},
-
-url = {https://doi.org/10.1145/3801927.3858633},
-
-doi = {10.1145/3801927.3858633},
-
-booktitle = {Proceedings of the 27th International Middleware Conference},
-
-keywords = {cloud computing, serverless computing, spot instances, DAG workflows, fault tolerance, checkpointing, adaptive scaling, workflow execution},
-
-location = {Tarragona, Spain},
-
-series = {Middleware '26}
+@inproceedings{patel2026faaspot,
+  title     = {{FaaSpot}: Fault-Tolerant Serverless Workflow Execution on Spot Instances},
+  author    = {Patel, Bandhan and Harsha, Sushruth and Oh, Kwangsung and Kim, In Kee},
+  booktitle = {Proceedings of the 27th International Middleware Conference (Middleware '26)},
+  year      = {2026},
+  doi       = {10.1145/3801927.3858633}
 }
-```
 ## License
-
-
 
 MIT License. See [LICENSE](LICENSE).
 
