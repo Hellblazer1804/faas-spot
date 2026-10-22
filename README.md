@@ -281,7 +281,9 @@ Set `DISCORD_WEBHOOK_URL` in `.env` to receive experiment progress notifications
 
 ---
 ## Citation
-If you find this work useful, please cite us at 
+If you find this work useful, please cite us at
+
+
 @inproceedings{10.1145/3801927.3858633,
 author = {Patel, Bandhan and Harsha, Sushruth and Oh, Kwangsung and Kim, In Kee},
 title = {FaaSpot: Fault-Tolerant Serverless Workflow Execution on Spot Instances},
