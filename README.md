@@ -19,7 +19,7 @@ Serverless workflows on spot instances fail frequently — complex DAG workflows
 
 FaaSpot addresses this by analyzing the workflow DAG **once at submission time** and classifying each task by the cascade impact of its preemption. This single offline classification drives three online fault-tolerance mechanisms — selective checkpointing, survival-aware scaling, and lineage-based retry — all running entirely on spot instances with no on-demand fallback.
 
-**Results across 8 DAG workflows:** 89.03% average success rate at $0.018 per successful run — 21 pp above the best baseline, at less than half the cost, with 2.3× lower mean latency.
+**Results across 8 DAG workflows:** 89.03% average success rate at $0.018 per successful run —21 pp above the average baseline success rate, at a lower cost per success than every baseline, with 2.3x lower mean latency.
 
 ---
 
