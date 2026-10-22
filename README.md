@@ -282,8 +282,9 @@ Set `DISCORD_WEBHOOK_URL` in `.env` to receive experiment progress notifications
 ---
 ## Citation
 
-If you find this work to be useful please cite us 
+If you find this work to be useful please cite us :
 
+```
 @inproceedings{10.1145/3801927.3858633,
 
 author = {Patel, Bandhan and Harsha, Sushruth and Oh, Kwangsung and Kim, In Kee},
@@ -310,7 +311,7 @@ location = {Tarragona, Spain},
 
 series = {Middleware '26}
 }
-
+```
 ## License
 
 
