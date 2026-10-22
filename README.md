@@ -285,7 +285,7 @@ Set `DISCORD_WEBHOOK_URL` in `.env` to receive experiment progress notifications
 ## Citation
 
 If you find this code or our work useful, please cite:
-
+```
 @inproceedings{patel2026faaspot,
   title     = {{FaaSpot}: Fault-Tolerant Serverless Workflow Execution on Spot Instances},
   author    = {Patel, Bandhan and Harsha, Sushruth and Oh, Kwangsung and Kim, In Kee},
@@ -293,6 +293,7 @@ If you find this code or our work useful, please cite:
   year      = {2026},
   doi       = {10.1145/3801927.3858633}
 }
+```
 ## License
 
 MIT License. See [LICENSE](LICENSE).
